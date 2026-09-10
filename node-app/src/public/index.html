@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CTS Extract</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="atmosphere" aria-hidden="true"></div>
+    <header class="top">
+      <p class="brand">CTS Extract</p>
+      <p id="adapter-pill" class="pill" hidden></p>
+    </header>
+
+    <main class="stage">
+      <section class="hero">
+        <h1>Transport requests, as CSV.</h1>
+        <p class="lede">
+          Pull change requests through
+          <code>CTS_API_READ_CHANGE_REQUEST</code>, preview the object list, and
+          download a file you can hand to audit or migration tools.
+        </p>
+      </section>
+
+      <section class="work" aria-label="Extraction form">
+        <form id="extract-form">
+          <label class="field wide">
+            <span>Request IDs</span>
+            <textarea
+              id="requests"
+              name="requests"
+              rows="3"
+              placeholder="S4HK900123, S4HK900124 — leave blank to use filters"
+            ></textarea>
+          </label>
+
+          <label class="field">
+            <span>Owner</span>
+            <input id="owner" name="owner" type="text" placeholder="AS4USER" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>Status</span>
+            <input id="status" name="status" type="text" placeholder="D / R / …" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>Category</span>
+            <input id="category" name="category" type="text" placeholder="K / W / T" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>Max</span>
+            <input id="max" name="max" type="number" value="500" min="1" max="5000" />
+          </label>
+          <label class="field">
+            <span>From</span>
+            <input id="dateFrom" name="dateFrom" type="date" />
+          </label>
+          <label class="field">
+            <span>To</span>
+            <input id="dateTo" name="dateTo" type="date" />
+          </label>
+
+          <div class="toggles">
+            <label class="check">
+              <input type="checkbox" id="includeHeaders" checked />
+              <span>Header rows</span>
+            </label>
+            <label class="check">
+              <input type="checkbox" id="includeObjects" checked />
+              <span>Object rows</span>
+            </label>
+          </div>
+
+          <div class="actions">
+            <button type="submit" class="primary" id="run-btn">
+              <span class="btn-label">Extract</span>
+            </button>
+            <button type="button" class="ghost" id="download-btn" disabled>
+              Download CSV
+            </button>
+          </div>
+        </form>
+
+        <div id="status-bar" class="status" role="status" aria-live="polite">
+          Ready.
+        </div>
+
+        <div class="table-wrap" id="table-wrap" hidden>
+          <table id="result-table">
+            <thead>
+              <tr>
+                <th>Request</th>
+                <th>Description</th>
+                <th>Owner</th>
+                <th>Status</th>
+                <th>Objects</th>
+                <th>Retcode</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

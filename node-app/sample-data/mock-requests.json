@@ -1,0 +1,74 @@
+[
+  {
+    "request": "S4HK900123",
+    "description": "Pricing condition enhancements",
+    "category": "K",
+    "client": "100",
+    "owner": "DEVELOPER1",
+    "status": "R",
+    "retcode": "000",
+    "message": "",
+    "as4date": "20260315",
+    "objects": [
+      { "pgmid": "R3TR", "object": "CLAS", "objName": "ZCL_PRICING_HELPER" },
+      { "pgmid": "R3TR", "object": "TABL", "objName": "ZPRC_COND_EXT" },
+      { "pgmid": "LIMU", "object": "METH", "objName": "ZCL_PRICING_HELPER=============CM001" }
+    ]
+  },
+  {
+    "request": "S4HK900124",
+    "description": "FI customizing: payment terms",
+    "category": "W",
+    "client": "100",
+    "owner": "CONFIG_USER",
+    "status": "R",
+    "retcode": "000",
+    "message": "",
+    "as4date": "20260318",
+    "objects": [
+      { "pgmid": "R3TR", "object": "TABU", "objName": "T052" },
+      { "pgmid": "R3TR", "object": "TABU", "objName": "T001" }
+    ]
+  },
+  {
+    "request": "S4HK900130",
+    "description": "SD output form update",
+    "category": "K",
+    "client": "100",
+    "owner": "DEVELOPER2",
+    "status": "D",
+    "retcode": "000",
+    "message": "",
+    "as4date": "20260401",
+    "objects": [
+      { "pgmid": "R3TR", "object": "SSFO", "objName": "ZSD_INVOICE_FORM" },
+      { "pgmid": "R3TR", "object": "PROG", "objName": "ZSD_PRINT_DRIVER" }
+    ]
+  },
+  {
+    "request": "S4HK900131",
+    "description": "Transport of copies — hotfix pack",
+    "category": "T",
+    "client": "100",
+    "owner": "BASIS",
+    "status": "R",
+    "retcode": "000",
+    "message": "",
+    "as4date": "20260402",
+    "objects": [
+      { "pgmid": "R3TR", "object": "PROG", "objName": "ZFIX_INVOICE_CHECK" }
+    ]
+  },
+  {
+    "request": "S4HK900199",
+    "description": "Unknown request (simulated failure)",
+    "category": "",
+    "client": "",
+    "owner": "",
+    "status": "",
+    "retcode": "008",
+    "message": "Change request does not exist",
+    "as4date": "20260101",
+    "objects": []
+  }
+]
