@@ -337,10 +337,16 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
 
 
   METHOD select_request_ids.
-    DATA: lt_e070 TYPE STANDARD TABLE OF e070 WITH DEFAULT KEY,
-          ls_e070 TYPE e070,
-          lv_id   TYPE string,
-          lv_max  TYPE i.
+    DATA: lt_e070     TYPE STANDARD TABLE OF e070 WITH DEFAULT KEY,
+          ls_e070     TYPE e070,
+          lv_id       TYPE string,
+          lv_max      TYPE i,
+          lv_from     TYPE as4date,
+          lv_to       TYPE as4date,
+          lv_owner    TYPE as4user,
+          lv_status   TYPE trstatus,
+          lv_category TYPE trfunction,
+          lv_blank    TYPE c LENGTH 1 VALUE space.
 
     CLEAR rt_trkorr.
     lv_max = is_filters-max.
@@ -359,13 +365,20 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
       RETURN.
     ENDIF.
 
+    " Open SQL host variables must be elementary (not STRING).
+    lv_from     = is_filters-date_from.
+    lv_to       = is_filters-date_to.
+    lv_owner    = is_filters-owner.
+    lv_status   = is_filters-status.
+    lv_category = is_filters-category.
+
     " Header requests only (STRKORR blank). Prefer explicit REQUEST list when possible.
     SELECT * FROM e070
-      WHERE as4date BETWEEN @is_filters-date_from AND @is_filters-date_to
-        AND strkorr = @space
-        AND ( @is_filters-owner    = @space OR as4user    = @is_filters-owner )
-        AND ( @is_filters-status   = @space OR trstatus   = @is_filters-status )
-        AND ( @is_filters-category = @space OR trfunction = @is_filters-category )
+      WHERE as4date BETWEEN @lv_from AND @lv_to
+        AND strkorr = @lv_blank
+        AND ( @lv_owner    = @lv_blank OR as4user    = @lv_owner )
+        AND ( @lv_status   = @lv_blank OR trstatus   = @lv_status )
+        AND ( @lv_category = @lv_blank OR trfunction = @lv_category )
       ORDER BY PRIMARY KEY
       INTO TABLE @lt_e070
       UP TO @lv_max ROWS.
