@@ -125,19 +125,21 @@ FORM select_requests.
 
   IF p_trkorr IS NOT INITIAL.
     SELECT * FROM e070
-      INTO TABLE gt_e070
-      UP TO p_max ROWS
-      WHERE trkorr  = p_trkorr
-        AND strkorr = space.
+      WHERE trkorr  = @p_trkorr
+        AND strkorr = @space
+      ORDER BY PRIMARY KEY
+      INTO TABLE @gt_e070
+      UP TO @p_max ROWS.
   ELSE.
     SELECT * FROM e070
-      INTO TABLE gt_e070
-      UP TO p_max ROWS
-      WHERE as4date BETWEEN p_from AND p_to
-        AND strkorr = space
-        AND ( p_user   IS INITIAL OR as4user    = p_user )
-        AND ( p_status IS INITIAL OR trstatus   = p_status )
-        AND ( p_funct  IS INITIAL OR trfunction = p_funct ).
+      WHERE as4date BETWEEN @p_from AND @p_to
+        AND strkorr = @space
+        AND ( @p_user   = @space OR as4user    = @p_user )
+        AND ( @p_status = @space OR trstatus   = @p_status )
+        AND ( @p_funct  = @space OR trfunction = @p_funct )
+      ORDER BY PRIMARY KEY
+      INTO TABLE @gt_e070
+      UP TO @p_max ROWS.
   ENDIF.
 
   SORT gt_e070 BY trkorr.
@@ -326,10 +328,11 @@ FORM output_csv.
       MESSAGE |GUI download failed (sy-subrc={ sy-subrc }).| TYPE 'E'.
     ENDIF.
   ELSE.
+    DATA lv_msg TYPE string.
     lv_path = p_path.
-    OPEN DATASET lv_path FOR OUTPUT IN TEXT MODE ENCODING UTF-8.
+    OPEN DATASET lv_path FOR OUTPUT IN TEXT MODE ENCODING UTF-8 MESSAGE lv_msg.
     IF sy-subrc <> 0.
-      MESSAGE |Cannot open dataset { lv_path }.| TYPE 'E'.
+      MESSAGE |Cannot open dataset { lv_path }: { lv_msg }.| TYPE 'E'.
     ENDIF.
     LOOP AT gt_csv INTO gv_line.
       TRANSFER gv_line TO lv_path.

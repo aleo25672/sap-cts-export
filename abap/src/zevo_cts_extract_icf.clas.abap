@@ -361,13 +361,14 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
 
     " Header requests only (STRKORR blank). Prefer explicit REQUEST list when possible.
     SELECT * FROM e070
-      INTO TABLE lt_e070
-      UP TO lv_max ROWS
-      WHERE as4date BETWEEN is_filters-date_from AND is_filters-date_to
-        AND strkorr = space
-        AND ( is_filters-owner    = '' OR as4user    = is_filters-owner )
-        AND ( is_filters-status   = '' OR trstatus   = is_filters-status )
-        AND ( is_filters-category = '' OR trfunction = is_filters-category ).
+      WHERE as4date BETWEEN @is_filters-date_from AND @is_filters-date_to
+        AND strkorr = @space
+        AND ( @is_filters-owner    = @space OR as4user    = @is_filters-owner )
+        AND ( @is_filters-status   = @space OR trstatus   = @is_filters-status )
+        AND ( @is_filters-category = @space OR trfunction = @is_filters-category )
+      ORDER BY PRIMARY KEY
+      INTO TABLE @lt_e070
+      UP TO @lv_max ROWS.
 
     SORT lt_e070 BY trkorr.
     LOOP AT lt_e070 INTO ls_e070.
