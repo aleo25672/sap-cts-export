@@ -97,18 +97,21 @@ Other API methods: `activate`, `deactivate`, `get_status`, `parse_batch`, `norma
 - User can maintain ICF (e.g. `S_ICF_ADM`).
 - After setup: assign logon procedure and authorizations for callers (not automated here).
 
-## Publish as its own Git remote
+## Origin repository
 
-This folder is a **complete abapGit project** (own `.abapgit.xml` + `src/`). Prefer a dedicated Git URL so product teams pull only SICF tooling.
+**Repo:** [`evolver/sicf-setup`](https://origin.cursor.com/evolver/sicf-setup)  
+**Clone / abapGit URL:** `https://origin.cursor.com/evolver/sicf-setup.git`
 
-From a monorepo checkout that contains this folder:
+Point abapGit at that URL (package `ZEVO_SICF`), not at the CTS extract product repo.
+
+### How this tree was published
+
+From the CTS monorepo:
 
 ```bash
 git subtree split --prefix=sicf-setup -b sicf-setup-main
-git push <sicf-remote> sicf-setup-main:main
+git push https://origin.cursor.com/evolver/sicf-setup.git sicf-setup-main:main
 ```
-
-Or copy the contents of `sicf-setup/` to the root of a new repository and push.
 
 ## Limits
 

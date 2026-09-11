@@ -9,7 +9,7 @@ Exposes CTS extract over **HTTP** so clients (including the Node `http` adapter)
 1. Pull this repo with **abapGit** into package `ZEVO_CTS` (see [`README.md`](./README.md)), **or** create class **`ZEVO_CTS_EXTRACT_ICF`** in SE24 / ADT and paste [`src/zevo_cts_extract_icf.clas.abap`](./src/zevo_cts_extract_icf.clas.abap).
 2. Activate (requires **`/UI2/CL_JSON`**).
 3. **SICF** — either:
-   - Pull the **separate** [`sicf-setup`](../sicf-setup/) abapGit project (package `ZEVO_SICF`), then SE38 → **`ZEVO_SICF_SETUP`** with URL `/sap/bc/zevo_cts_extract` and handler `ZEVO_CTS_EXTRACT_ICF` (recommended; see [`../sicf-setup/README.md`](../sicf-setup/README.md) and [`../sicf-setup/examples/cts-extract.batch`](../sicf-setup/examples/cts-extract.batch)), or
+   - abapGit-pull Origin repo **[`evolver/sicf-setup`](https://origin.cursor.com/evolver/sicf-setup)** into package `ZEVO_SICF`, then SE38 → **`ZEVO_SICF_SETUP`** with URL `/sap/bc/zevo_cts_extract` and handler `ZEVO_CTS_EXTRACT_ICF` (recommended; see [`../sicf-setup/README.md`](../sicf-setup/README.md) and [`../sicf-setup/examples/cts-extract.batch`](../sicf-setup/examples/cts-extract.batch)), or
    - Transaction **SICF** → `default_host` → `sap` → `bc` → create service **`zevo_cts_extract`** manually.
 4. Handler List → `ZEVO_CTS_EXTRACT_ICF` (the setup report does this when Ensure is used).
 5. Configure logon (Basic Auth recommended for machine users).

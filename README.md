@@ -10,7 +10,7 @@ Three ways to pull SAP transport / change requests and get CSV. **Default path i
 
 ABAP objects are packaged for **[abapGit](https://docs.abapgit.org/)** (`.abapgit.xml` + `abap/src/*.prog.xml` / `*.clas.xml`). See [`abap/README.md`](./abap/README.md).
 
-**SICF setup is a separate abapGit project:** [`sicf-setup/`](./sicf-setup/) (own `.abapgit.xml`, package `ZEVO_SICF`). Prefer publishing that folder as its own Git remote so other products can pull it without the CTS extract objects.
+**SICF setup is a separate Origin + abapGit project:** folder [`sicf-setup/`](./sicf-setup/) → Origin repo [`evolver/sicf-setup`](https://origin.cursor.com/evolver/sicf-setup) (package `ZEVO_SICF`). Pull that URL in abapGit independently of this CTS extract repo.
 
 ```text
 1) SE38 report  →  E070/E07T/E071  (or CTS_API per TR)  →  CSV
