@@ -23,8 +23,7 @@
 *&---------------------------------------------------------------------*
 REPORT zevo_cts_extract_requests.
 
-SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME.
-SELECTION-SCREEN COMMENT /1(79) c_b1.
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-001.
 PARAMETERS:
   p_trkorr TYPE trkorr,
   p_user   TYPE tr_as4user,
@@ -34,31 +33,22 @@ PARAMETERS:
   p_funct  TYPE trfunction. " K=Workbench W=Customizing T=ToC
 SELECTION-SCREEN END OF BLOCK b1.
 
-SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME.
-SELECTION-SCREEN COMMENT /1(79) c_b2.
+SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE TEXT-002.
 PARAMETERS:
   p_gui  RADIOBUTTON GROUP out DEFAULT 'X',
   p_file RADIOBUTTON GROUP out,
   p_path TYPE string LOWER CASE DEFAULT '/tmp/cts_extract.csv'.
 SELECTION-SCREEN END OF BLOCK b2.
 
-SELECTION-SCREEN BEGIN OF BLOCK b3 WITH FRAME.
-SELECTION-SCREEN COMMENT /1(79) c_b3.
+SELECTION-SCREEN BEGIN OF BLOCK b3 WITH FRAME TITLE TEXT-003.
 PARAMETERS:
-  p_hdr AS CHECKBOX DEFAULT 'X', " CSV: request header rows
-  p_obj AS CHECKBOX DEFAULT 'X'. " CSV: object detail rows
+  p_hdr AS CHECKBOX DEFAULT 'X',
+  p_obj AS CHECKBOX DEFAULT 'X'.
 SELECTION-SCREEN END OF BLOCK b3.
 
-SELECTION-SCREEN BEGIN OF BLOCK b4 WITH FRAME.
-SELECTION-SCREEN COMMENT /1(79) c_b4.
-PARAMETERS p_max TYPE i DEFAULT 500. " safety cap
+SELECTION-SCREEN BEGIN OF BLOCK b4 WITH FRAME TITLE TEXT-004.
+PARAMETERS p_max TYPE i DEFAULT 500.
 SELECTION-SCREEN END OF BLOCK b4.
-
-INITIALIZATION.
-  c_b1 = 'Selection: E070 headers, then CTS_API_READ_CHANGE_REQUEST per request'.
-  c_b2 = 'Output: GUI download or application-server file'.
-  c_b3 = 'CSV content: headers and/or object lines'.
-  c_b4 = 'Limits'.
 
 TYPES: BEGIN OF ty_header_row,
          request     TYPE char20,
