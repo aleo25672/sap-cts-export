@@ -1,22 +1,16 @@
 *&---------------------------------------------------------------------*
 *& Report ZEVO_SICF_SETUP
 *&---------------------------------------------------------------------*
-*& Generic SICF / ICF setup utility (any project).
+*& Generic SICF / ICF setup utility (standalone tool repo).
 *&
-*& Examples
-*&   1) Single service (this repo):
-*&        URL      = /sap/bc/zevo_cts_extract
-*&        Handler  = ZEVO_CTS_EXTRACT_ICF
-*&        Action   = Ensure + Activate
+*& Defaults: edit include ZEVO_SICF_SETUP_CFG, or fill the screen / batch.
 *&
-*&   2) Batch (other projects) — one line per service:
-*&        /sap/bc/zmy_api;ZCL_MY_HTTP_HANDLER;My API
-*&        /sap/bc/zother;ZCL_OTHER_HANDLER;ZCL_OTHER_HANDLER2;Other API
-*&
-*& Line format: URL;HANDLER[;HANDLER…][;description]
+*& Batch line format: URL;HANDLER[;HANDLER…][;description]
 *& Lines starting with # are comments.
 *&---------------------------------------------------------------------*
 REPORT zevo_sicf_setup.
+
+INCLUDE zevo_sicf_setup_cfg.
 
 * Radios / checkboxes: COMMENT + INITIALIZATION so labels show even when
 * only the .abap is pasted (no text-pool import).
@@ -52,9 +46,9 @@ SELECTION-SCREEN END OF BLOCK m.
 
 SELECTION-SCREEN BEGIN OF BLOCK s WITH FRAME TITLE TEXT-003.
 PARAMETERS:
-  p_url  TYPE text100 LOWER CASE DEFAULT '/sap/bc/zevo_cts_extract' MODIF ID sng,
-  p_hand TYPE seoclsname DEFAULT 'ZEVO_CTS_EXTRACT_ICF' MODIF ID sng,
-  p_desc TYPE text60 DEFAULT 'EVO CTS Extract HTTP API' MODIF ID sng.
+  p_url  TYPE text100 LOWER CASE MODIF ID sng,
+  p_hand TYPE seoclsname MODIF ID sng,
+  p_desc TYPE text60 MODIF ID sng.
 SELECTION-SCREEN END OF BLOCK s.
 
 SELECTION-SCREEN BEGIN OF BLOCK b WITH FRAME TITLE TEXT-004.
@@ -92,6 +86,17 @@ INITIALIZATION.
   c_batch = 'Batch (multi-project)'(015).
   c_actv  = 'Activate after save'(016).
   c_dry   = 'Dry-run (no changes)'(017).
+
+  " Apply repo / fork defaults from ZEVO_SICF_SETUP_CFG when set
+  IF gc_sicf_cfg_url IS NOT INITIAL.
+    p_url = gc_sicf_cfg_url.
+  ENDIF.
+  IF gc_sicf_cfg_hand IS NOT INITIAL.
+    p_hand = gc_sicf_cfg_hand.
+  ENDIF.
+  IF gc_sicf_cfg_desc IS NOT INITIAL.
+    p_desc = gc_sicf_cfg_desc.
+  ENDIF.
 
 AT SELECTION-SCREEN OUTPUT.
   LOOP AT SCREEN.
@@ -135,6 +140,11 @@ FORM run.
       RETURN.
     ENDIF.
   ELSE.
+    IF p_url IS INITIAL OR p_hand IS INITIAL.
+      MESSAGE 'Enter ICF URL path and handler class (or set ZEVO_SICF_SETUP_CFG).'
+              TYPE 'S' DISPLAY LIKE 'E'.
+      RETURN.
+    ENDIF.
     CLEAR ls_def.
     ls_def-url         = p_url.
     ls_def-description = p_desc.

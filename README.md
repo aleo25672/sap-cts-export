@@ -10,6 +10,8 @@ Three ways to pull SAP transport / change requests and get CSV. **Default path i
 
 ABAP objects are packaged for **[abapGit](https://docs.abapgit.org/)** (`.abapgit.xml` + `abap/src/*.prog.xml` / `*.clas.xml`). See [`abap/README.md`](./abap/README.md).
 
+**SICF setup is a separate abapGit project:** [`sicf-setup/`](./sicf-setup/) (own `.abapgit.xml`, package `ZEVO_SICF`). Prefer publishing that folder as its own Git remote so other products can pull it without the CTS extract objects.
+
 ```text
 1) SE38 report  →  E070/E07T/E071  (or CTS_API per TR)  →  CSV
 2) Node RFC     →  RFC_READ_TABLE  (or CTS_API per TR)  →  CSV
@@ -56,7 +58,7 @@ Requires NWRFC SDK, network to the app server, and an RFC user that can call `RF
 
 ## Option 3 — Custom ABAP ICF + Node HTTP adapter
 
-1. Install ABAP via abapGit (or paste the class), then wire SICF with the reusable report **`ZEVO_SICF_SETUP`** ([`abap/SICF_SETUP.md`](./abap/SICF_SETUP.md)) — same tool works for other ICF projects — or manually per [`abap/ICF.md`](./abap/ICF.md)
+1. Install ABAP via abapGit (or paste the class). Wire SICF with the **separate** tool repo [`sicf-setup/`](./sicf-setup/) (report **`ZEVO_SICF_SETUP`**, package `ZEVO_SICF`) — or manually per [`abap/ICF.md`](./abap/ICF.md)
 2. Point Node at it:
 
 ```bash

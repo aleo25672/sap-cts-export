@@ -1,13 +1,14 @@
 *&---------------------------------------------------------------------*
 *& Class ZEVO_CL_SICF_SETUP
 *&---------------------------------------------------------------------*
-*& Generic ICF / SICF administrator — reusable across projects.
+*& Generic ICF / SICF administrator — standalone tool (own abapGit repo).
 *&
 *& Call from report ZEVO_SICF_SETUP, or from any project post-install:
 *&   DATA(ls) = zevo_cl_sicf_setup=>ensure( is_def = … ).
 *&
-*& SICF is not covered by abapGit; this class closes that gap with a
-*& parameter-driven API. Requires ICF admin authorization (e.g. S_ICF_ADM).
+*& Configure defaults via include ZEVO_SICF_SETUP_CFG (not product code).
+*& SICF is not covered by abapGit; this class closes that gap.
+*& Requires ICF admin authorization (e.g. S_ICF_ADM).
 *&
 *& CL_ICF_TREE method names differ by BASIS release — methods are invoked
 *& dynamically with common fallbacks; failures return a clear message.
