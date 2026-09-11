@@ -56,7 +56,7 @@ Requires NWRFC SDK, network to the app server, and an RFC user that can call `RF
 
 ## Option 3 — Custom ABAP ICF + Node HTTP adapter
 
-1. Install ABAP via abapGit (or paste the class), then wire SICF: [`abap/ICF.md`](./abap/ICF.md) / [`abap/src/zevo_cts_extract_icf.clas.abap`](./abap/src/zevo_cts_extract_icf.clas.abap)
+1. Install ABAP via abapGit (or paste the class), then wire SICF with the reusable report **`ZEVO_SICF_SETUP`** ([`abap/SICF_SETUP.md`](./abap/SICF_SETUP.md)) — same tool works for other ICF projects — or manually per [`abap/ICF.md`](./abap/ICF.md)
 2. Point Node at it:
 
 ```bash

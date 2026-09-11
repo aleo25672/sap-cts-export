@@ -11,6 +11,7 @@
     <item>/README.md</item>
     <item>/abap/README.md</item>
     <item>/abap/ICF.md</item>
+    <item>/abap/SICF_SETUP.md</item>
    </IGNORE>
   </DATA>
  </asx:values>

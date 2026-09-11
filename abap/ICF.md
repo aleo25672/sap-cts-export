@@ -8,10 +8,12 @@ Exposes CTS extract over **HTTP** so clients (including the Node `http` adapter)
 
 1. Pull this repo with **abapGit** into package `ZEVO_CTS` (see [`README.md`](./README.md)), **or** create class **`ZEVO_CTS_EXTRACT_ICF`** in SE24 / ADT and paste [`src/zevo_cts_extract_icf.clas.abap`](./src/zevo_cts_extract_icf.clas.abap).
 2. Activate (requires **`/UI2/CL_JSON`**).
-3. **SICF** → `default_host` → `sap` → `bc` → create service **`zevo_cts_extract`** (SICF is not part of the abapGit dump — create once).
-4. Handler List → `ZEVO_CTS_EXTRACT_ICF`.
+3. **SICF** — either:
+   - Run report **`ZEVO_SICF_SETUP`** (recommended; see [`SICF_SETUP.md`](./SICF_SETUP.md)), or
+   - Transaction **SICF** → `default_host` → `sap` → `bc` → create service **`zevo_cts_extract`** manually.
+4. Handler List → `ZEVO_CTS_EXTRACT_ICF` (the setup report does this when Ensure is used).
 5. Configure logon (Basic Auth recommended for machine users).
-6. Activate the service.
+6. Activate the service (Ensure can activate; confirm in SICF).
 
 URL shape:
 

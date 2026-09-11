@@ -13,6 +13,10 @@ abap/src/
   zevo_cts_extract_requests.prog.xml
   zevo_cts_extract_icf.clas.abap
   zevo_cts_extract_icf.clas.xml
+  zevo_cl_sicf_setup.clas.abap        ← generic SICF API (any project)
+  zevo_cl_sicf_setup.clas.xml
+  zevo_sicf_setup.prog.abap           ← SICF setup report
+  zevo_sicf_setup.prog.xml
 ```
 
 | Object | Name |
@@ -20,6 +24,8 @@ abap/src/
 | Package (suggested) | `ZEVO_CTS` |
 | Report | `ZEVO_CTS_EXTRACT_REQUESTS` |
 | ICF class | `ZEVO_CTS_EXTRACT_ICF` |
+| SICF utility class | `ZEVO_CL_SICF_SETUP` |
+| SICF utility report | `ZEVO_SICF_SETUP` |
 
 ## Import with abapGit (recommended)
 
@@ -29,14 +35,14 @@ abap/src/
 2. **New online** → paste the Git URL of this repo.
 3. Create/assign package **`ZEVO_CTS`** (or another `Z*` package).
 4. **Pull** → activate.
-5. Create the SICF node manually (see [`ICF.md`](./ICF.md)) — SICF is not serialized here.
+5. Create the SICF node with report **`ZEVO_SICF_SETUP`** (see [`SICF_SETUP.md`](./SICF_SETUP.md)) or manually (see [`ICF.md`](./ICF.md)).
 
 ### Offline (ZIP)
 
 1. On GitHub: **Code → Download ZIP** (or `git archive`).
 2. In abapGit: **New offline** → upload the ZIP.
 3. Pull / install into package `ZEVO_CTS` → activate.
-4. Create SICF as in [`ICF.md`](./ICF.md).
+4. Create SICF with **`ZEVO_SICF_SETUP`** or as in [`ICF.md`](./ICF.md).
 
 ## Performance
 
@@ -56,7 +62,7 @@ The Node **RFC** and **HTTP** adapters mirror the same default vs. use-FM switch
 - Activate `ZEVO_CTS_EXTRACT_REQUESTS` and `ZEVO_CTS_EXTRACT_ICF`.
 - Confirm `CTS_OBJ` field names in SE11 if object mapping is empty.
 - ICF class needs `/UI2/CL_JSON`.
-- Wire SICF `/sap/bc/zevo_cts_extract` → handler `ZEVO_CTS_EXTRACT_ICF`.
+- Wire SICF with **`ZEVO_SICF_SETUP`** (defaults: `/sap/bc/zevo_cts_extract` → `ZEVO_CTS_EXTRACT_ICF`); see [`SICF_SETUP.md`](./SICF_SETUP.md).
 - For app-server CSV output, maintain logical file **`ZEVO_CTS_EXTRACT`** in transaction **FILE** (see below).
 
 ## Logical file (transaction FILE)
