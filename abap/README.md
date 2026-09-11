@@ -73,3 +73,8 @@ When **Write app-server file** is selected, the report resolves the path with `F
 ## Manual paste (fallback)
 
 If abapGit is not available, create the program/class in SE38/SE24 and paste the `.abap` sources from `abap/src/`.
+
+Radio/checkbox labels are set in `INITIALIZATION` in the report source, so they appear even without importing the text pool. For typed fields (`P_TRKORR`, dates, …), either:
+
+1. Prefer **abapGit pull** (imports `*.prog.xml` selection texts), or  
+2. In SE38 → **Goto → Text elements → Selection texts**, enter the labels, save, activate.
