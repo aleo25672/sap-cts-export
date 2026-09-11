@@ -28,6 +28,11 @@ export type ExtractFilters = {
   max?: number;
   includeHeaders?: boolean;
   includeObjects?: boolean;
+  /**
+   * When true, call CTS_API_READ_CHANGE_REQUEST once per request (slow).
+   * Default false: bulk E070/E07T/E071 (RFC_READ_TABLE or ABAP Open SQL).
+   */
+  useFm?: boolean;
 };
 
 export type ExtractResult = {

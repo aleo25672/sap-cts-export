@@ -19,6 +19,7 @@ function payloadFromForm() {
     max: Number(document.getElementById("max").value || 500),
     includeHeaders: document.getElementById("includeHeaders").checked,
     includeObjects: document.getElementById("includeObjects").checked,
+    useFm: document.getElementById("useFm").checked,
   };
 }
 
@@ -71,7 +72,11 @@ form.addEventListener("submit", async (event) => {
   lastPayload = payloadFromForm();
   runBtn.disabled = true;
   downloadBtn.disabled = true;
-  setStatus("Calling CTS_API_READ_CHANGE_REQUEST…");
+  setStatus(
+    lastPayload.useFm
+      ? "Calling CTS_API_READ_CHANGE_REQUEST…"
+      : "Extracting via bulk CTS tables…",
+  );
 
   try {
     const res = await fetch("/api/extract", {

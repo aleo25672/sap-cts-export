@@ -100,6 +100,8 @@ export class HttpAdapter implements CtsAdapter {
       dateFrom: filters.dateFrom ?? "",
       dateTo: filters.dateTo ?? "",
       max: filters.max && filters.max > 0 ? filters.max : 500,
+      includeObjects: filters.includeObjects !== false,
+      useFm: filters.useFm === true,
       format: "json",
     };
 

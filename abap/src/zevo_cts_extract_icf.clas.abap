@@ -1,7 +1,12 @@
 *&---------------------------------------------------------------------*
 *& Class ZEVO_CTS_EXTRACT_ICF
 *&---------------------------------------------------------------------*
-*& ICF HTTP handler around CTS_API_READ_CHANGE_REQUEST.
+*& ICF HTTP handler for CTS extract.
+*&
+*& Performance
+*&   Default: bulk read E070 / E07T / E071 (fast).
+*&   Optional JSON/query "useFm": true → CTS_API_READ_CHANGE_REQUEST
+*&   once per request (slow, API-faithful).
 *&
 *& Install
 *&   1. SE24 / ADT: create public final class ZEVO_CTS_EXTRACT_ICF
@@ -23,6 +28,8 @@
 *&   "dateFrom": "20260101",
 *&   "dateTo": "20261231",
 *&   "max": 500,
+*&   "includeObjects": true,
+*&   "useFm": false,
 *&   "format": "json"
 *& }
 *&
@@ -61,27 +68,52 @@ CLASS zevo_cts_extract_icf DEFINITION
            END OF ty_request.
     TYPES tty_request TYPE STANDARD TABLE OF ty_request WITH DEFAULT KEY.
 
+    TYPES: BEGIN OF ty_e070_key,
+             trkorr     TYPE trkorr,
+             as4user    TYPE tr_as4user,
+             trfunction TYPE trfunction,
+             trstatus   TYPE trstatus,
+             as4date    TYPE as4date,
+           END OF ty_e070_key.
+    TYPES tty_e070 TYPE STANDARD TABLE OF ty_e070_key WITH EMPTY KEY.
+
+    TYPES: BEGIN OF ty_e07t,
+             trkorr  TYPE trkorr,
+             as4text TYPE as4text,
+           END OF ty_e07t.
+
+    TYPES: BEGIN OF ty_e071,
+             trkorr   TYPE trkorr,
+             pgmid    TYPE pgmid,
+             object   TYPE trobjtype,
+             obj_name TYPE sobj_name,
+           END OF ty_e071.
+
     TYPES: BEGIN OF ty_filters,
-             requests  TYPE string_table,
-             owner     TYPE string,
-             status    TYPE string,
-             category  TYPE string,
-             date_from TYPE as4date,
-             date_to   TYPE as4date,
-             max       TYPE i,
-             format    TYPE string,
+             requests         TYPE string_table,
+             owner            TYPE string,
+             status           TYPE string,
+             category         TYPE string,
+             date_from        TYPE as4date,
+             date_to          TYPE as4date,
+             max              TYPE i,
+             format           TYPE string,
+             include_objects  TYPE abap_bool,
+             use_fm           TYPE abap_bool,
            END OF ty_filters.
 
     " JSON body DTO (string dates → converted after deserialize)
     TYPES: BEGIN OF ty_json_in,
-             requests  TYPE string_table,
-             owner     TYPE string,
-             status    TYPE string,
-             category  TYPE string,
-             date_from TYPE string,
-             date_to   TYPE string,
-             max       TYPE i,
-             format    TYPE string,
+             requests         TYPE string_table,
+             owner            TYPE string,
+             status           TYPE string,
+             category         TYPE string,
+             date_from        TYPE string,
+             date_to          TYPE string,
+             max              TYPE i,
+             format           TYPE string,
+             include_objects  TYPE abap_bool,
+             use_fm           TYPE abap_bool,
            END OF ty_json_in.
 
     TYPES: BEGIN OF ty_response,
@@ -99,9 +131,23 @@ CLASS zevo_cts_extract_icf DEFINITION
       IMPORTING io_request        TYPE REF TO if_http_request
       RETURNING VALUE(rs_filters) TYPE ty_filters.
 
-    METHODS select_request_ids
-      IMPORTING is_filters       TYPE ty_filters
-      RETURNING VALUE(rt_trkorr) TYPE string_table.
+    METHODS select_headers
+      IMPORTING is_filters     TYPE ty_filters
+      RETURNING VALUE(rt_e070) TYPE tty_e070.
+
+    METHODS extract_via_tables
+      IMPORTING is_filters        TYPE ty_filters
+                it_e070           TYPE tty_e070
+      EXPORTING et_requests       TYPE tty_request
+                ev_ok             TYPE i
+                ev_fail           TYPE i.
+
+    METHODS extract_via_cts_api
+      IMPORTING is_filters        TYPE ty_filters
+                it_e070           TYPE tty_e070
+      EXPORTING et_requests       TYPE tty_request
+                ev_ok             TYPE i
+                ev_fail           TYPE i.
 
     METHODS read_change_request
       IMPORTING iv_trkorr         TYPE clike
@@ -114,6 +160,10 @@ CLASS zevo_cts_extract_icf DEFINITION
     METHODS to_ymd
       IMPORTING iv_raw         TYPE clike
       RETURNING VALUE(rv_date) TYPE as4date.
+
+    METHODS parse_bool
+      IMPORTING iv_raw          TYPE clike
+      RETURNING VALUE(rv_bool)  TYPE abap_bool.
 
     METHODS build_csv
       IMPORTING it_requests   TYPE tty_request
@@ -164,9 +214,7 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
 
   METHOD handle_extract.
     DATA: ls_filters  TYPE ty_filters,
-          lt_ids      TYPE string_table,
-          lv_id       TYPE string,
-          ls_request  TYPE ty_request,
+          lt_e070     TYPE tty_e070,
           lt_requests TYPE tty_request,
           ls_response TYPE ty_response,
           lv_json     TYPE string,
@@ -183,18 +231,27 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
       ls_filters-format = 'json'.
     ENDIF.
 
-    lt_ids = select_request_ids( ls_filters ).
+    lt_e070 = select_headers( ls_filters ).
 
-    LOOP AT lt_ids INTO lv_id.
-      CLEAR ls_request.
-      ls_request = read_change_request( lv_id ).
-      IF ls_request-retcode IS NOT INITIAL AND ls_request-retcode <> '000'.
-        ADD 1 TO lv_fail.
-      ELSE.
-        ADD 1 TO lv_ok.
-      ENDIF.
-      APPEND ls_request TO lt_requests.
-    ENDLOOP.
+    IF ls_filters-use_fm = abap_true.
+      extract_via_cts_api(
+        EXPORTING
+          is_filters  = ls_filters
+          it_e070     = lt_e070
+        IMPORTING
+          et_requests = lt_requests
+          ev_ok       = lv_ok
+          ev_fail     = lv_fail ).
+    ELSE.
+      extract_via_tables(
+        EXPORTING
+          is_filters  = ls_filters
+          it_e070     = lt_e070
+        IMPORTING
+          et_requests = lt_requests
+          ev_ok       = lv_ok
+          ev_fail     = lv_fail ).
+    ENDIF.
 
     IF ls_filters-format = 'csv'.
       lv_csv = build_csv( lt_requests ).
@@ -247,10 +304,12 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
           lx_json     TYPE REF TO cx_root.
 
     CLEAR rs_filters.
-    rs_filters-date_from = sy-datum.
-    rs_filters-date_to   = sy-datum.
-    rs_filters-max       = 500.
-    rs_filters-format    = 'json'.
+    rs_filters-date_from       = sy-datum.
+    rs_filters-date_to         = sy-datum.
+    rs_filters-max             = 500.
+    rs_filters-format          = 'json'.
+    rs_filters-include_objects = abap_true.
+    rs_filters-use_fm          = abap_false.
 
     lv_form = io_request->get_form_field( 'request' ).
     IF lv_form IS INITIAL.
@@ -282,6 +341,12 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
     ENDIF.
     IF io_request->get_form_field( 'format' ) IS NOT INITIAL.
       rs_filters-format = to_lower( io_request->get_form_field( 'format' ) ).
+    ENDIF.
+    IF io_request->get_form_field( 'includeObjects' ) IS NOT INITIAL.
+      rs_filters-include_objects = parse_bool( io_request->get_form_field( 'includeObjects' ) ).
+    ENDIF.
+    IF io_request->get_form_field( 'useFm' ) IS NOT INITIAL.
+      rs_filters-use_fm = parse_bool( io_request->get_form_field( 'useFm' ) ).
     ENDIF.
 
     lv_body = io_request->get_cdata( ).
@@ -325,6 +390,13 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
           IF ls_json-format IS NOT INITIAL.
             rs_filters-format = to_lower( ls_json-format ).
           ENDIF.
+          " Only override when the key is present — omitted booleans deserialize as false.
+          IF lv_body CS '"includeObjects"' OR lv_body CS '"include_objects"'.
+            rs_filters-include_objects = ls_json-include_objects.
+          ENDIF.
+          IF lv_body CS '"useFm"' OR lv_body CS '"use_fm"'.
+            rs_filters-use_fm = ls_json-use_fm.
+          ENDIF.
         CATCH cx_root INTO lx_json. "#EC NEEDED
           " Keep query-string filters when body is not JSON
       ENDTRY.
@@ -336,19 +408,19 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
   ENDMETHOD.
 
 
-  METHOD select_request_ids.
-    DATA: lt_e070     TYPE STANDARD TABLE OF e070 WITH DEFAULT KEY,
-          ls_e070     TYPE e070,
-          lv_id       TYPE string,
+  METHOD select_headers.
+    DATA: lv_id       TYPE string,
+          lv_trkorr   TYPE trkorr,
           lv_max      TYPE i,
           lv_from     TYPE as4date,
           lv_to       TYPE as4date,
           lv_owner    TYPE as4user,
           lv_status   TYPE trstatus,
           lv_category TYPE trfunction,
-          lv_blank    TYPE c LENGTH 1 VALUE space.
+          ls_e070     TYPE ty_e070_key,
+          lt_keys     TYPE STANDARD TABLE OF trkorr WITH EMPTY KEY.
 
-    CLEAR rt_trkorr.
+    CLEAR rt_e070.
     lv_max = is_filters-max.
     IF lv_max <= 0.
       lv_max = 500.
@@ -359,29 +431,210 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
         CONDENSE lv_id.
         TRANSLATE lv_id TO UPPER CASE.
         IF lv_id IS NOT INITIAL.
-          APPEND lv_id TO rt_trkorr.
+          lv_trkorr = lv_id.
+          APPEND lv_trkorr TO lt_keys.
         ENDIF.
       ENDLOOP.
+      IF lt_keys IS INITIAL.
+        RETURN.
+      ENDIF.
+      SELECT trkorr, as4user, trfunction, trstatus, as4date
+        FROM e070
+        FOR ALL ENTRIES IN @lt_keys
+        WHERE trkorr  = @lt_keys-table_line
+          AND strkorr = @space
+        INTO TABLE @rt_e070
+        UP TO @lv_max ROWS.
+      " Keep explicit IDs even if E070 row missing (FM path may still work)
+      IF lines( rt_e070 ) < lines( lt_keys ).
+        LOOP AT lt_keys INTO lv_trkorr.
+          READ TABLE rt_e070 INTO ls_e070 WITH KEY trkorr = lv_trkorr.
+          IF sy-subrc <> 0.
+            CLEAR ls_e070.
+            ls_e070-trkorr = lv_trkorr.
+            APPEND ls_e070 TO rt_e070.
+          ENDIF.
+        ENDLOOP.
+      ENDIF.
       RETURN.
     ENDIF.
 
-    " Open SQL host variables must be elementary (not STRING).
     lv_from     = is_filters-date_from.
     lv_to       = is_filters-date_to.
     lv_owner    = is_filters-owner.
     lv_status   = is_filters-status.
     lv_category = is_filters-category.
 
-    " Header requests only (STRKORR blank). Select TRKORR only for speed.
-    SELECT trkorr FROM e070
-      WHERE as4date BETWEEN @lv_from AND @lv_to
-        AND strkorr = @lv_blank
-        AND ( @lv_owner    = @lv_blank OR as4user    = @lv_owner )
-        AND ( @lv_status   = @lv_blank OR trstatus   = @lv_status )
-        AND ( @lv_category = @lv_blank OR trfunction = @lv_category )
-      ORDER BY PRIMARY KEY
-      INTO TABLE @rt_trkorr
-      UP TO @lv_max ROWS.
+    " Avoid OR on empty filters so AS4DATE / AS4USER indexes stay usable.
+    IF lv_owner IS NOT INITIAL AND lv_status IS NOT INITIAL AND lv_category IS NOT INITIAL.
+      SELECT trkorr, as4user, trfunction, trstatus, as4date
+        FROM e070
+        WHERE as4date    BETWEEN @lv_from AND @lv_to
+          AND strkorr    = @space
+          AND as4user    = @lv_owner
+          AND trstatus   = @lv_status
+          AND trfunction = @lv_category
+        ORDER BY PRIMARY KEY
+        INTO TABLE @rt_e070
+        UP TO @lv_max ROWS.
+
+    ELSEIF lv_owner IS NOT INITIAL AND lv_status IS NOT INITIAL.
+      SELECT trkorr, as4user, trfunction, trstatus, as4date
+        FROM e070
+        WHERE as4date  BETWEEN @lv_from AND @lv_to
+          AND strkorr  = @space
+          AND as4user  = @lv_owner
+          AND trstatus = @lv_status
+        ORDER BY PRIMARY KEY
+        INTO TABLE @rt_e070
+        UP TO @lv_max ROWS.
+
+    ELSEIF lv_owner IS NOT INITIAL AND lv_category IS NOT INITIAL.
+      SELECT trkorr, as4user, trfunction, trstatus, as4date
+        FROM e070
+        WHERE as4date    BETWEEN @lv_from AND @lv_to
+          AND strkorr    = @space
+          AND as4user    = @lv_owner
+          AND trfunction = @lv_category
+        ORDER BY PRIMARY KEY
+        INTO TABLE @rt_e070
+        UP TO @lv_max ROWS.
+
+    ELSEIF lv_status IS NOT INITIAL AND lv_category IS NOT INITIAL.
+      SELECT trkorr, as4user, trfunction, trstatus, as4date
+        FROM e070
+        WHERE as4date    BETWEEN @lv_from AND @lv_to
+          AND strkorr    = @space
+          AND trstatus   = @lv_status
+          AND trfunction = @lv_category
+        ORDER BY PRIMARY KEY
+        INTO TABLE @rt_e070
+        UP TO @lv_max ROWS.
+
+    ELSEIF lv_owner IS NOT INITIAL.
+      SELECT trkorr, as4user, trfunction, trstatus, as4date
+        FROM e070
+        WHERE as4date BETWEEN @lv_from AND @lv_to
+          AND strkorr = @space
+          AND as4user = @lv_owner
+        ORDER BY PRIMARY KEY
+        INTO TABLE @rt_e070
+        UP TO @lv_max ROWS.
+
+    ELSEIF lv_status IS NOT INITIAL.
+      SELECT trkorr, as4user, trfunction, trstatus, as4date
+        FROM e070
+        WHERE as4date  BETWEEN @lv_from AND @lv_to
+          AND strkorr  = @space
+          AND trstatus = @lv_status
+        ORDER BY PRIMARY KEY
+        INTO TABLE @rt_e070
+        UP TO @lv_max ROWS.
+
+    ELSEIF lv_category IS NOT INITIAL.
+      SELECT trkorr, as4user, trfunction, trstatus, as4date
+        FROM e070
+        WHERE as4date    BETWEEN @lv_from AND @lv_to
+          AND strkorr    = @space
+          AND trfunction = @lv_category
+        ORDER BY PRIMARY KEY
+        INTO TABLE @rt_e070
+        UP TO @lv_max ROWS.
+
+    ELSE.
+      SELECT trkorr, as4user, trfunction, trstatus, as4date
+        FROM e070
+        WHERE as4date BETWEEN @lv_from AND @lv_to
+          AND strkorr = @space
+        ORDER BY PRIMARY KEY
+        INTO TABLE @rt_e070
+        UP TO @lv_max ROWS.
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD extract_via_tables.
+    DATA: ls_e070  TYPE ty_e070_key,
+          ls_e07t  TYPE ty_e07t,
+          ls_e071  TYPE ty_e071,
+          ls_req   TYPE ty_request,
+          ls_obj   TYPE ty_object,
+          lt_keys  TYPE STANDARD TABLE OF trkorr WITH EMPTY KEY,
+          lt_e07t  TYPE HASHED TABLE OF ty_e07t WITH UNIQUE KEY trkorr,
+          lt_e071  TYPE SORTED TABLE OF ty_e071 WITH NON-UNIQUE KEY trkorr.
+
+    CLEAR: et_requests, ev_ok, ev_fail.
+
+    LOOP AT it_e070 INTO ls_e070.
+      APPEND ls_e070-trkorr TO lt_keys.
+    ENDLOOP.
+    IF lt_keys IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    SELECT trkorr, as4text
+      FROM e07t
+      FOR ALL ENTRIES IN @lt_keys
+      WHERE trkorr = @lt_keys-table_line
+        AND langu  = @sy-langu
+      INTO TABLE @lt_e07t.
+
+    IF is_filters-include_objects = abap_true.
+      SELECT trkorr, pgmid, object, obj_name
+        FROM e071
+        FOR ALL ENTRIES IN @lt_keys
+        WHERE trkorr = @lt_keys-table_line
+        INTO TABLE @lt_e071.
+    ENDIF.
+
+    LOOP AT it_e070 INTO ls_e070.
+      CLEAR ls_req.
+      ls_req-request  = ls_e070-trkorr.
+      ls_req-category = ls_e070-trfunction.
+      ls_req-owner    = ls_e070-as4user.
+      ls_req-status   = ls_e070-trstatus.
+      ls_req-retcode  = '000'.
+
+      READ TABLE lt_e07t INTO ls_e07t WITH TABLE KEY trkorr = ls_e070-trkorr.
+      IF sy-subrc = 0.
+        ls_req-description = ls_e07t-as4text.
+      ENDIF.
+
+      IF is_filters-include_objects = abap_true.
+        LOOP AT lt_e071 INTO ls_e071 WHERE trkorr = ls_e070-trkorr.
+          CLEAR ls_obj.
+          ls_obj-pgmid    = ls_e071-pgmid.
+          ls_obj-object   = ls_e071-object.
+          ls_obj-obj_name = ls_e071-obj_name.
+          APPEND ls_obj TO ls_req-objects.
+        ENDLOOP.
+      ENDIF.
+
+      APPEND ls_req TO et_requests.
+      ADD 1 TO ev_ok.
+    ENDLOOP.
+  ENDMETHOD.
+
+
+  METHOD extract_via_cts_api.
+    DATA: ls_e070    TYPE ty_e070_key,
+          ls_request TYPE ty_request.
+
+    CLEAR: et_requests, ev_ok, ev_fail.
+
+    LOOP AT it_e070 INTO ls_e070.
+      CLEAR ls_request.
+      ls_request = read_change_request( ls_e070-trkorr ).
+      IF is_filters-include_objects = abap_false.
+        CLEAR ls_request-objects.
+      ENDIF.
+      IF ls_request-retcode IS NOT INITIAL AND ls_request-retcode <> '000'.
+        ADD 1 TO ev_fail.
+      ELSE.
+        ADD 1 TO ev_ok.
+      ENDIF.
+      APPEND ls_request TO et_requests.
+    ENDLOOP.
   ENDMETHOD.
 
 
@@ -467,6 +720,18 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
     CONDENSE lv NO-GAPS.
     IF strlen( lv ) >= 8.
       rv_date = lv(8).
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD parse_bool.
+    DATA lv TYPE string.
+    lv = to_upper( iv_raw ).
+    CONDENSE lv NO-GAPS.
+    IF lv = 'X' OR lv = 'TRUE' OR lv = '1' OR lv = 'YES'.
+      rv_bool = abap_true.
+    ELSE.
+      rv_bool = abap_false.
     ENDIF.
   ENDMETHOD.
 

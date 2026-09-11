@@ -17,8 +17,10 @@ UI: http://127.0.0.1:43127
 | `CTS_ADAPTER` | Needs | Calls |
 |---------------|-------|-------|
 | `mock` | nothing | sample JSON |
-| `rfc` | NWRFC SDK + `node-rfc` | `CTS_API_READ_CHANGE_REQUEST` over RFC |
-| `http` | `CTS_HTTP_URL` (+ Basic/Bearer) | ABAP ICF `ZEVO_CTS_EXTRACT_ICF` over HTTPS |
+| `rfc` | NWRFC SDK + `node-rfc` | Default: `RFC_READ_TABLE` on `E070`/`E07T`/`E071`; optional `CTS_API_READ_CHANGE_REQUEST` per TR (`useFm`) |
+| `http` | `CTS_HTTP_URL` (+ Basic/Bearer) | ABAP ICF `ZEVO_CTS_EXTRACT_ICF` (same bulk/FM behavior server-side) |
+
+Pass `"useFm": true` in the UI/API, or CLI `--use-fm`, to force the slow FM path on RFC/HTTP.
 
 ### RFC
 

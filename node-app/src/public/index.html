@@ -23,9 +23,9 @@
       <section class="hero">
         <h1>Transport requests, as CSV.</h1>
         <p class="lede">
-          Pull change requests through
-          <code>CTS_API_READ_CHANGE_REQUEST</code>, preview the object list, and
-          download a file you can hand to audit or migration tools.
+          Bulk-read transport headers and objects from CTS tables by default
+          (same path as the ABAP report). Optionally fall back to
+          <code>CTS_API_READ_CHANGE_REQUEST</code> per request, then download CSV.
         </p>
       </section>
 
@@ -74,6 +74,10 @@
             <label class="check">
               <input type="checkbox" id="includeObjects" checked />
               <span>Object rows</span>
+            </label>
+            <label class="check">
+              <input type="checkbox" id="useFm" />
+              <span>Use CTS API (slow)</span>
             </label>
           </div>
 

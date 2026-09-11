@@ -27,6 +27,7 @@ async function main() {
     max: arg("max") ? Number(arg("max")) : 500,
     includeHeaders: !flag("no-headers"),
     includeObjects: !flag("no-objects"),
+    useFm: flag("use-fm"),
   };
 
   const adapter = createAdapter();

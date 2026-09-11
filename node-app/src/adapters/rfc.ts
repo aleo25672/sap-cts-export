@@ -14,6 +14,16 @@ type RfcClient = {
 
 type RfcClientCtor = new (params: Record<string, string>) => RfcClient;
 
+type HeaderRow = {
+  trkorr: string;
+  trfunction: string;
+  trstatus: string;
+  as4user: string;
+};
+
+const OPTION_WIDTH = 72;
+const TRKORR_CHUNK = 40;
+
 function connectionParams(): Record<string, string> {
   if (process.env.SAP_DEST) {
     return { dest: process.env.SAP_DEST };
@@ -40,58 +50,260 @@ function toYmd(raw?: string): string | undefined {
   return digits.length === 8 ? digits : undefined;
 }
 
+function asString(value: unknown): string {
+  if (value == null) return "";
+  return String(value).trim();
+}
+
 function mapObjects(raw: unknown): CtsObject[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((row) => {
     const r = row as Record<string, unknown>;
     return {
-      pgmid: String(r.PGMID ?? r.pgmid ?? ""),
-      object: String(r.OBJECT ?? r.object ?? ""),
-      objName: String(r.OBJ_NAME ?? r.OBJNAME ?? r.obj_name ?? r.objName ?? ""),
+      pgmid: asString(r.PGMID ?? r.pgmid),
+      object: asString(r.OBJECT ?? r.object),
+      objName: asString(r.OBJ_NAME ?? r.OBJNAME ?? r.obj_name ?? r.objName),
     };
   });
 }
 
-async function listRequestIds(
+function parseFields(fieldsRaw: unknown): string[] {
+  if (!Array.isArray(fieldsRaw)) return [];
+  return fieldsRaw.map((f) => {
+    if (typeof f === "string") return f;
+    if (f && typeof f === "object" && "FIELDNAME" in f) {
+      return asString((f as { FIELDNAME: unknown }).FIELDNAME);
+    }
+    return "";
+  });
+}
+
+function parseDataRows(dataRaw: unknown, fieldNames: string[]): Record<string, string>[] {
+  if (!Array.isArray(dataRaw)) return [];
+  return dataRaw.map((row) => {
+    let wa = "";
+    if (typeof row === "string") wa = row;
+    else if (row && typeof row === "object" && "WA" in row) {
+      wa = String((row as { WA: unknown }).WA ?? "");
+    }
+    const parts = wa.split("|");
+    const out: Record<string, string> = {};
+    fieldNames.forEach((name, i) => {
+      out[name] = asString(parts[i]);
+    });
+    return out;
+  });
+}
+
+/** RFC_READ_TABLE OPTIONS lines are limited to 72 characters. */
+function pushOptionLines(lines: Array<{ TEXT: string }>, text: string): void {
+  for (let i = 0; i < text.length; i += OPTION_WIDTH) {
+    lines.push({ TEXT: text.slice(i, i + OPTION_WIDTH) });
+  }
+}
+
+function headerFilterOptions(filters: ExtractFilters): Array<{ TEXT: string }> {
+  const from = toYmd(filters.dateFrom) ?? "19000101";
+  const to = toYmd(filters.dateTo) ?? "99991231";
+  const options: Array<{ TEXT: string }> = [];
+  pushOptionLines(options, `AS4DATE GE '${from}' AND AS4DATE LE '${to}'`);
+  options.push({ TEXT: `AND STRKORR EQ ' '` });
+  if (filters.owner?.trim()) {
+    options.push({
+      TEXT: `AND AS4USER EQ '${filters.owner.trim().toUpperCase().replace(/'/g, "''")}'`,
+    });
+  }
+  if (filters.status?.trim()) {
+    options.push({
+      TEXT: `AND TRSTATUS EQ '${filters.status.trim().toUpperCase().replace(/'/g, "''")}'`,
+    });
+  }
+  if (filters.category?.trim()) {
+    options.push({
+      TEXT: `AND TRFUNCTION EQ '${filters.category.trim().toUpperCase().replace(/'/g, "''")}'`,
+    });
+  }
+  return options;
+}
+
+/** Build TRKORR EQ … OR … OPTIONS for a chunk of request ids. */
+function trkorrOptions(ids: string[]): Array<{ TEXT: string }> {
+  const lines: Array<{ TEXT: string }> = [];
+  ids.forEach((id, index) => {
+    const escaped = id.replace(/'/g, "''");
+    const piece =
+      index === 0 ? `TRKORR EQ '${escaped}'` : ` OR TRKORR EQ '${escaped}'`;
+    if (lines.length === 0) {
+      lines.push({ TEXT: piece.slice(0, OPTION_WIDTH) });
+      return;
+    }
+    const last = lines[lines.length - 1]!;
+    if (last.TEXT.length + piece.length <= OPTION_WIDTH) {
+      last.TEXT += piece;
+    } else {
+      lines.push({ TEXT: piece.trimStart().slice(0, OPTION_WIDTH) });
+    }
+  });
+  return lines;
+}
+
+async function rfcReadTable(
+  client: RfcClient,
+  queryTable: string,
+  fields: string[],
+  options: Array<{ TEXT: string }>,
+  rowCount: number,
+): Promise<Record<string, string>[]> {
+  const result = await client.call("RFC_READ_TABLE", {
+    QUERY_TABLE: queryTable,
+    DELIMITER: "|",
+    ROWCOUNT: rowCount,
+    FIELDS: fields.map((FIELDNAME) => ({ FIELDNAME })),
+    OPTIONS: options,
+  });
+  const parsedNames = parseFields(result.FIELDS);
+  const fieldNames = parsedNames.length ? parsedNames : fields;
+  return parseDataRows(result.DATA, fieldNames);
+}
+
+async function readHeaders(
   client: RfcClient,
   filters: ExtractFilters,
-): Promise<string[]> {
+): Promise<HeaderRow[]> {
   if (filters.requests?.length) {
-    return [...new Set(filters.requests.map((r) => r.trim().toUpperCase()).filter(Boolean))];
+    const ids = [
+      ...new Set(filters.requests.map((r) => r.trim().toUpperCase()).filter(Boolean)),
+    ];
+    const max = filters.max && filters.max > 0 ? filters.max : 500;
+    const limited = ids.slice(0, max);
+    const rows: HeaderRow[] = [];
+    for (let i = 0; i < limited.length; i += TRKORR_CHUNK) {
+      const chunk = limited.slice(i, i + TRKORR_CHUNK);
+      const data = await rfcReadTable(
+        client,
+        "E070",
+        ["TRKORR", "TRFUNCTION", "TRSTATUS", "AS4USER"],
+        trkorrOptions(chunk),
+        0,
+      );
+      for (const r of data) {
+        const trkorr = r.TRKORR ?? "";
+        if (!trkorr) continue;
+        rows.push({
+          trkorr,
+          trfunction: r.TRFUNCTION ?? "",
+          trstatus: r.TRSTATUS ?? "",
+          as4user: r.AS4USER ?? "",
+        });
+      }
+    }
+    // Preserve caller order for explicit IDs
+    const byId = new Map(rows.map((r) => [r.trkorr, r]));
+    return limited
+      .map((id) => byId.get(id) ?? { trkorr: id, trfunction: "", trstatus: "", as4user: "" })
+      .filter((r) => r.trkorr);
   }
 
   const max = filters.max && filters.max > 0 ? filters.max : 500;
-  const from = toYmd(filters.dateFrom) ?? "19000101";
-  const to = toYmd(filters.dateTo) ?? "99991231";
-
-  // RFC_READ_TABLE against E070 — headers only (STRKORR blank).
-  // Note: OPTIONS length is limited; keep predicates short.
-  const options: Array<{ TEXT: string }> = [
-    { TEXT: `AS4DATE GE '${from}' AND AS4DATE LE '${to}'` },
-    { TEXT: `AND STRKORR EQ ' '` },
-  ];
-  if (filters.owner) {
-    options.push({ TEXT: `AND AS4USER EQ '${filters.owner.toUpperCase()}'` });
-  }
-  if (filters.status) {
-    options.push({ TEXT: `AND TRSTATUS EQ '${filters.status.toUpperCase()}'` });
-  }
-  if (filters.category) {
-    options.push({ TEXT: `AND TRFUNCTION EQ '${filters.category.toUpperCase()}'` });
-  }
-
-  const result = await client.call("RFC_READ_TABLE", {
-    QUERY_TABLE: "E070",
-    DELIMITER: "|",
-    ROWCOUNT: max,
-    OPTIONS: options,
-    FIELDS: [{ FIELDNAME: "TRKORR" }],
-  });
-
-  const data = (result.DATA as Array<{ WA?: string }> | undefined) ?? [];
+  const data = await rfcReadTable(
+    client,
+    "E070",
+    ["TRKORR", "TRFUNCTION", "TRSTATUS", "AS4USER"],
+    headerFilterOptions(filters),
+    max,
+  );
   return data
-    .map((row) => (row.WA ?? "").split("|")[0]?.trim() ?? "")
-    .filter(Boolean);
+    .map((r) => ({
+      trkorr: r.TRKORR ?? "",
+      trfunction: r.TRFUNCTION ?? "",
+      trstatus: r.TRSTATUS ?? "",
+      as4user: r.AS4USER ?? "",
+    }))
+    .filter((r) => r.trkorr);
+}
+
+async function readTextsChunked(
+  client: RfcClient,
+  ids: string[],
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += TRKORR_CHUNK) {
+    const chunk = ids.slice(i, i + TRKORR_CHUNK);
+    const rows = await rfcReadTable(
+      client,
+      "E07T",
+      ["TRKORR", "AS4TEXT"],
+      trkorrOptions(chunk),
+      0,
+    );
+    for (const r of rows) {
+      const id = r.TRKORR ?? "";
+      if (id && !map.has(id)) map.set(id, r.AS4TEXT ?? "");
+    }
+  }
+  return map;
+}
+
+async function readObjectsChunked(
+  client: RfcClient,
+  ids: string[],
+): Promise<Map<string, CtsObject[]>> {
+  const map = new Map<string, CtsObject[]>();
+  for (let i = 0; i < ids.length; i += TRKORR_CHUNK) {
+    const chunk = ids.slice(i, i + TRKORR_CHUNK);
+    const rows = await rfcReadTable(
+      client,
+      "E071",
+      ["TRKORR", "PGMID", "OBJECT", "OBJ_NAME"],
+      trkorrOptions(chunk),
+      0,
+    );
+    for (const r of rows) {
+      const id = r.TRKORR ?? "";
+      if (!id) continue;
+      const list = map.get(id) ?? [];
+      list.push({
+        pgmid: r.PGMID ?? "",
+        object: r.OBJECT ?? "",
+        objName: r.OBJ_NAME ?? "",
+      });
+      map.set(id, list);
+    }
+  }
+  return map;
+}
+
+async function extractViaTables(
+  client: RfcClient,
+  filters: ExtractFilters,
+): Promise<ExtractResult> {
+  const headers = await readHeaders(client, filters);
+  const ids = headers.map((h) => h.trkorr);
+  const texts = ids.length ? await readTextsChunked(client, ids) : new Map<string, string>();
+  const objects =
+    filters.includeObjects === false || ids.length === 0
+      ? new Map<string, CtsObject[]>()
+      : await readObjectsChunked(client, ids);
+
+  const requests: ChangeRequest[] = headers.map((h) => ({
+    request: h.trkorr,
+    description: texts.get(h.trkorr) ?? "",
+    category: h.trfunction,
+    client: "",
+    owner: h.as4user,
+    status: h.trstatus,
+    retcode: "000",
+    message: "",
+    objects: objects.get(h.trkorr) ?? [],
+  }));
+
+  return {
+    adapter: "rfc",
+    fetchedAt: new Date().toISOString(),
+    requests,
+    ok: requests.length,
+    failed: 0,
+  };
 }
 
 async function readChangeRequest(
@@ -105,14 +317,53 @@ async function readChangeRequest(
 
   return {
     request,
-    description: String(result.DESCRIPTION ?? ""),
-    category: String(result.CATEGORY ?? ""),
-    client: String(result.CLIENT ?? ""),
-    owner: String(result.OWNER ?? ""),
-    status: String(result.STATUS ?? ""),
-    retcode: String(result.RETCODE ?? "000"),
-    message: String(result.MESSAGE ?? ""),
+    description: asString(result.DESCRIPTION),
+    category: asString(result.CATEGORY),
+    client: asString(result.CLIENT),
+    owner: asString(result.OWNER),
+    status: asString(result.STATUS),
+    retcode: asString(result.RETCODE) || "000",
+    message: asString(result.MESSAGE),
     objects: mapObjects(result.OBJECTS),
+  };
+}
+
+async function extractViaFm(
+  client: RfcClient,
+  filters: ExtractFilters,
+): Promise<ExtractResult> {
+  const headers = await readHeaders(client, filters);
+  const requests: ChangeRequest[] = [];
+
+  for (const h of headers) {
+    try {
+      const row = await readChangeRequest(client, h.trkorr);
+      if (filters.includeObjects === false) {
+        row.objects = [];
+      }
+      requests.push(row);
+    } catch (err) {
+      requests.push({
+        request: h.trkorr,
+        description: "",
+        category: h.trfunction,
+        client: "",
+        owner: h.as4user,
+        status: h.trstatus,
+        retcode: "999",
+        message: err instanceof Error ? err.message : String(err),
+        objects: [],
+      });
+    }
+  }
+
+  const failed = requests.filter((r) => r.retcode && r.retcode !== "000").length;
+  return {
+    adapter: "rfc",
+    fetchedAt: new Date().toISOString(),
+    requests,
+    ok: requests.length - failed,
+    failed,
   };
 }
 
@@ -134,34 +385,10 @@ export class RfcAdapter implements CtsAdapter {
     await client.open();
 
     try {
-      const ids = await listRequestIds(client, filters);
-      const requests: ChangeRequest[] = [];
-      for (const id of ids) {
-        try {
-          requests.push(await readChangeRequest(client, id));
-        } catch (err) {
-          requests.push({
-            request: id,
-            description: "",
-            category: "",
-            client: "",
-            owner: "",
-            status: "",
-            retcode: "999",
-            message: err instanceof Error ? err.message : String(err),
-            objects: [],
-          });
-        }
+      if (filters.useFm === true) {
+        return await extractViaFm(client, filters);
       }
-
-      const failed = requests.filter((r) => r.retcode && r.retcode !== "000").length;
-      return {
-        adapter: "rfc",
-        fetchedAt: new Date().toISOString(),
-        requests,
-        ok: requests.length - failed,
-        failed,
-      };
+      return await extractViaTables(client, filters);
     } finally {
       await client.close().catch(() => undefined);
     }

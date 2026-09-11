@@ -35,6 +35,7 @@ function parseBody(body: Record<string, unknown>): ExtractFilters {
     max: body.max != null && body.max !== "" ? Number(body.max) : 500,
     includeHeaders: body.includeHeaders !== false && body.includeHeaders !== "false",
     includeObjects: body.includeObjects !== false && body.includeObjects !== "false",
+    useFm: body.useFm === true || body.useFm === "true" || body.useFm === "X",
   };
 }
 
@@ -84,6 +85,8 @@ app.get("/sap/bc/zevo_cts_extract", async (req, res) => {
       dateFrom: q.dateFrom ?? "",
       dateTo: q.dateTo ?? "",
       max: q.max ?? 500,
+      includeObjects: q.includeObjects ?? true,
+      useFm: q.useFm ?? false,
     });
     const result = await new MockAdapter().extract(filters);
     if (String(q.format || "json").toLowerCase() === "csv") {

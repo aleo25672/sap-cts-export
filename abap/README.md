@@ -40,14 +40,16 @@ abap/src/
 
 ## Performance
 
-By default the report uses **bulk table reads** (`E070` / `E07T` / `E071`) — typically seconds even for hundreds of transports.
+By default the **report** and **ICF class** use **bulk table reads** (`E070` / `E07T` / `E071`) — typically seconds even for hundreds of transports.
 
-Optional checkbox **Use CTS API (slow)** calls `CTS_API_READ_CHANGE_REQUEST` once per request (API-faithful, much slower). Use only when you need the FM path specifically.
+Optional **Use CTS API (slow)** / JSON `"useFm": true` calls `CTS_API_READ_CHANGE_REQUEST` once per request (API-faithful, much slower). Use only when you need the FM path specifically.
 
 Also:
 - Selects only required columns (not `SELECT *`)
 - Avoids `OR` on empty filters so date/owner indexes stay usable
 - Caps volume with **Max requests**
+
+The Node **RFC** and **HTTP** adapters mirror the same default vs. use-FM switch.
 
 ## After import
 

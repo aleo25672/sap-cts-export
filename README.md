@@ -1,24 +1,24 @@
 # CTS Extract
 
-Three ways to pull SAP transport / change requests through **`CTS_API_READ_CHANGE_REQUEST`** and get CSV:
+Three ways to pull SAP transport / change requests and get CSV. **Default path is bulk `E070` / `E07T` / `E071`** (fast). Optional **use FM** mode calls `CTS_API_READ_CHANGE_REQUEST` once per request.
 
 | # | Option | Path | When to use |
 |---|--------|------|-------------|
 | **1** | **Pure ABAP report** | [`abap/src/zevo_cts_extract_requests.prog.abap`](./abap/src/zevo_cts_extract_requests.prog.abap) | Run inside SAP (SE38 / abapGit); GUI download or app-server file |
-| **2** | **Node + RFC adapter** | [`node-app/`](./node-app/) with `CTS_ADAPTER=rfc` | Direct RFC from Node via `node-rfc` + NWRFC SDK |
-| **3** | **ABAP ICF + Node HTTP** | [`abap/src/zevo_cts_extract_icf.clas.abap`](./abap/src/zevo_cts_extract_icf.clas.abap) + `CTS_ADAPTER=http` | HTTPS to a custom SICF service that wraps the FM |
+| **2** | **Node + RFC adapter** | [`node-app/`](./node-app/) with `CTS_ADAPTER=rfc` | Direct RFC from Node via `node-rfc` + NWRFC SDK (`RFC_READ_TABLE`) |
+| **3** | **ABAP ICF + Node HTTP** | [`abap/src/zevo_cts_extract_icf.clas.abap`](./abap/src/zevo_cts_extract_icf.clas.abap) + `CTS_ADAPTER=http` | HTTPS to a custom SICF service |
 
 ABAP objects are packaged for **[abapGit](https://docs.abapgit.org/)** (`.abapgit.xml` + `abap/src/*.prog.xml` / `*.clas.xml`). See [`abap/README.md`](./abap/README.md).
 
 ```text
-1) SE38 report  →  CTS_API_READ_CHANGE_REQUEST  →  CSV
-2) Node RFC     →  CTS_API_READ_CHANGE_REQUEST  →  CSV
-3) Node HTTP    →  ICF ZEVO_CTS_EXTRACT_ICF  →  CTS_API_READ_CHANGE_REQUEST  →  JSON/CSV
+1) SE38 report  →  E070/E07T/E071  (or CTS_API per TR)  →  CSV
+2) Node RFC     →  RFC_READ_TABLE  (or CTS_API per TR)  →  CSV
+3) Node HTTP    →  ICF ZEVO_CTS_EXTRACT_ICF → same bulk/FM paths → JSON/CSV
 ```
 
 ## Function module
 
-`CTS_API_READ_CHANGE_REQUEST` (function group `CTS_API`, remote-enabled):
+`CTS_API_READ_CHANGE_REQUEST` (function group `CTS_API`, remote-enabled) — **optional slow path**:
 
 | Direction | Parameter | Type |
 |-----------|-----------|------|
@@ -26,7 +26,7 @@ ABAP objects are packaged for **[abapGit](https://docs.abapgit.org/)** (`.abapgi
 | Exporting | `DESCRIPTION`, `CATEGORY`, `CLIENT`, `OWNER`, `STATUS`, `RETCODE`, `MESSAGE` | text / char |
 | Tables | `OBJECTS` | `CTS_OBJ` |
 
-The FM reads **one** request. All options resolve a list of IDs (from `E070` or an explicit list), then call the FM per ID.
+The FM reads **one** request. Default extractors read CTS tables in bulk instead; check **Use CTS API (slow)** / `"useFm": true` / CLI `--use-fm` when you need the FM specifically.
 
 ---
 
@@ -50,7 +50,7 @@ npm install node-rfc   # needs SAP NWRFC SDK on the machine
 npm start
 ```
 
-Requires NWRFC SDK, network to the app server, and an RFC user that can call the FM (and `RFC_READ_TABLE` on `E070` if you filter by date/owner).
+Requires NWRFC SDK, network to the app server, and an RFC user that can call `RFC_READ_TABLE` on `E070`/`E07T`/`E071` (and `CTS_API_READ_CHANGE_REQUEST` if you enable use-FM mode).
 
 ---
 

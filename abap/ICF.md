@@ -1,6 +1,8 @@
 # ABAP ICF handler — `ZEVO_CTS_EXTRACT_ICF`
 
-Exposes `CTS_API_READ_CHANGE_REQUEST` over **HTTP** so clients (including the Node `http` adapter) do not need RFC.
+Exposes CTS extract over **HTTP** so clients (including the Node `http` adapter) do not need RFC.
+
+**Performance (same as the SE38 report):** default path bulk-reads `E070` / `E07T` / `E071`. Set `"useFm": true` to call `CTS_API_READ_CHANGE_REQUEST` once per request (slow, API-faithful).
 
 ## Install
 
@@ -34,11 +36,18 @@ Authorization: Basic …
   "dateFrom": "20260301",
   "dateTo": "20260430",
   "max": 500,
+  "includeObjects": true,
+  "useFm": false,
   "format": "json"
 }
 ```
 
 If `requests` is empty, headers are selected from `E070` using the filters (same idea as the SE38 report).
+
+| Field | Default | Notes |
+|-------|---------|-------|
+| `includeObjects` | `true` | When false, skip `E071` / object list |
+| `useFm` | `false` | When true, one `CTS_API_READ_CHANGE_REQUEST` per request |
 
 ### GET
 
