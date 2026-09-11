@@ -1,39 +1,50 @@
-# ABAP extractors
+# ABAP (abapGit)
 
-## 1. Pure ABAP report (option 1)
+This folder is an **abapGit** project (see `.abapgit.xml` at the repo root).  
+You do **not** need a single hand-made “import.xml” — abapGit uses one `.xml` metadata file **per object**, next to the `.abap` source.
 
-Executable report that selects transport headers from `E070`, calls **`CTS_API_READ_CHANGE_REQUEST`** for each request, and writes a CSV (GUI download or app-server file).
+## Layout
 
-### Install
+```text
+.abapgit.xml                          ← repo root (abapGit config)
+abap/src/
+  package.devc.xml                    ← package metadata
+  zevo_cts_extract_requests.prog.abap
+  zevo_cts_extract_requests.prog.xml
+  zevo_cts_extract_icf.clas.abap
+  zevo_cts_extract_icf.clas.xml
+```
 
-1. SE38 / ADT: create program `ZEVO_CTS_EXTRACT_REQUESTS` (Executable).
-2. Paste [`zevo_cts_extract_requests.abap`](./zevo_cts_extract_requests.abap) and activate.
-3. In SE11, open **`CTS_OBJ`** and confirm component names (`PGMID`, `OBJECT`, `OBJ_NAME` or `OBJNAME`). Adjust `FORM map_cts_object` if needed.
+| Object | Name |
+|--------|------|
+| Package (suggested) | `ZEVO_CTS` |
+| Report | `ZEVO_CTS_EXTRACT_REQUESTS` |
+| ICF class | `ZEVO_CTS_EXTRACT_ICF` |
 
-### Selection parameters
+## Import with abapGit (recommended)
 
-| Parameter | Meaning |
-|-----------|---------|
-| `P_TRKORR` | Single transport (skips date/owner filters) |
-| `P_USER` | Owner (`E070-AS4USER`) |
-| `P_FROM` / `P_TO` | Creation date range |
-| `P_STATUS` | `E070-TRSTATUS` |
-| `P_FUNCT` | `E070-TRFUNCTION` (`K` / `W` / `T`) |
-| `P_GUI` / `P_FILE` | GUI download vs dataset |
-| `P_PATH` | App-server path when `P_FILE` is set |
-| `P_HDR` / `P_OBJ` | Header and/or object CSV rows |
-| `P_MAX` | Max requests (default 500) |
+### Online (GitHub / Origin URL)
 
----
+1. Install [abapGit](https://docs.abapgit.org/) in the SAP system.
+2. **New online** → paste the Git URL of this repo.
+3. Create/assign package **`ZEVO_CTS`** (or another `Z*` package).
+4. **Pull** → activate.
+5. Create the SICF node manually (see [`ICF.md`](./ICF.md)) — SICF is not serialized here.
 
-## 3. ICF HTTP handler (option 3)
+### Offline (ZIP)
 
-Class **`ZEVO_CTS_EXTRACT_ICF`** — see [`ICF.md`](./ICF.md) and [`zevo_cts_extract_icf.clas.abap`](./zevo_cts_extract_icf.clas.abap).
+1. On GitHub: **Code → Download ZIP** (or `git archive`).
+2. In abapGit: **New offline** → upload the ZIP.
+3. Pull / install into package `ZEVO_CTS` → activate.
+4. Create SICF as in [`ICF.md`](./ICF.md).
 
-Same FM underneath; exposes JSON/CSV over HTTPS for the Node `http` adapter.
+## After import
 
----
+- Activate `ZEVO_CTS_EXTRACT_REQUESTS` and `ZEVO_CTS_EXTRACT_ICF`.
+- Confirm `CTS_OBJ` field names in SE11 if object mapping is empty.
+- ICF class needs `/UI2/CL_JSON`.
+- Wire SICF `/sap/bc/zevo_cts_extract` → handler `ZEVO_CTS_EXTRACT_ICF`.
 
-## Authorizations
+## Manual paste (fallback)
 
-Caller needs CTS display authority (typically `S_TRANSPRT`). ICF also needs service execution rights for the technical user.
+If abapGit is not available, create the program/class in SE38/SE24 and paste the `.abap` sources from `abap/src/`.
