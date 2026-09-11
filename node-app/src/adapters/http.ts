@@ -80,13 +80,13 @@ function endpointUrl(): string {
   const base = (process.env.CTS_HTTP_URL || "").trim().replace(/\/$/, "");
   if (!base) {
     throw new Error(
-      "CTS_HTTP_URL is required when CTS_ADAPTER=http (e.g. https://host:44300/sap/bc/zcts_extract?sap-client=100).",
+      "CTS_HTTP_URL is required when CTS_ADAPTER=http (e.g. https://host:44300/sap/bc/evo_cts_extract?sap-client=100).",
     );
   }
   return base;
 }
 
-/** Calls the custom ABAP ICF handler (ZCL_CTS_EXTRACT_ICF). */
+/** Calls the custom ABAP ICF handler (EVO_CTS_EXTRACT_ICF). */
 export class HttpAdapter implements CtsAdapter {
   readonly name = "http" as const;
 

@@ -1,18 +1,18 @@
 *&---------------------------------------------------------------------*
-*& Class ZCL_CTS_EXTRACT_ICF
+*& Class EVO_CTS_EXTRACT_ICF
 *&---------------------------------------------------------------------*
 *& ICF HTTP handler around CTS_API_READ_CHANGE_REQUEST.
 *&
 *& Install
-*&   1. SE24 / ADT: create public final class ZCL_CTS_EXTRACT_ICF
+*&   1. SE24 / ADT: create public final class EVO_CTS_EXTRACT_ICF
 *&   2. Paste this source and activate
-*&   3. SICF (default_host → sap → bc): create service ZCTS_EXTRACT
-*&      Handler List: ZCL_CTS_EXTRACT_ICF
+*&   3. SICF (default_host → sap → bc): create service EVO_CTS_EXTRACT
+*&      Handler List: EVO_CTS_EXTRACT_ICF
 *&      Enable Basic Authentication (or Standard SAP logon)
 *&   4. Activate the ICF node
 *&
 *& URL
-*&   https://<host>:<port>/sap/bc/zcts_extract
+*&   https://<host>:<port>/sap/bc/evo_cts_extract
 *&
 *& POST application/json
 *& {
@@ -32,7 +32,7 @@
 *& Depends on /UI2/CL_JSON. Adjust CTS_OBJ component mapping in
 *& map_cts_object if SE11 names differ on your system.
 *&---------------------------------------------------------------------*
-CLASS zcl_cts_extract_icf DEFINITION
+CLASS evo_cts_extract_icf DEFINITION
   PUBLIC
   FINAL
   CREATE PUBLIC.
@@ -129,7 +129,7 @@ CLASS zcl_cts_extract_icf DEFINITION
 ENDCLASS.
 
 
-CLASS zcl_cts_extract_icf IMPLEMENTATION.
+CLASS evo_cts_extract_icf IMPLEMENTATION.
 
   METHOD if_http_extension~handle_request.
     DATA lv_method TYPE string.
