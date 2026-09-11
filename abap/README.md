@@ -38,6 +38,17 @@ abap/src/
 3. Pull / install into package `ZEVO_CTS` → activate.
 4. Create SICF as in [`ICF.md`](./ICF.md).
 
+## Performance
+
+By default the report uses **bulk table reads** (`E070` / `E07T` / `E071`) — typically seconds even for hundreds of transports.
+
+Optional checkbox **Use CTS API (slow)** calls `CTS_API_READ_CHANGE_REQUEST` once per request (API-faithful, much slower). Use only when you need the FM path specifically.
+
+Also:
+- Selects only required columns (not `SELECT *`)
+- Avoids `OR` on empty filters so date/owner indexes stay usable
+- Caps volume with **Max requests**
+
 ## After import
 
 - Activate `ZEVO_CTS_EXTRACT_REQUESTS` and `ZEVO_CTS_EXTRACT_ICF`.

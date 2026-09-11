@@ -131,6 +131,13 @@
     </item>
     <item>
      <ID>S</ID>
+     <KEY>P_USEFM</KEY>
+     <ENTRY>Use CTS API (slow)</ENTRY>
+     <LENGTH>26</LENGTH>
+     <SPLIT>D</SPLIT>
+    </item>
+    <item>
+     <ID>S</ID>
      <KEY>P_MAX</KEY>
      <ENTRY>Max requests</ENTRY>
      <LENGTH>20</LENGTH>

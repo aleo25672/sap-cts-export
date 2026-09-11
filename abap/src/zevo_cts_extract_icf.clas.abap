@@ -372,22 +372,16 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
     lv_status   = is_filters-status.
     lv_category = is_filters-category.
 
-    " Header requests only (STRKORR blank). Prefer explicit REQUEST list when possible.
-    SELECT * FROM e070
+    " Header requests only (STRKORR blank). Select TRKORR only for speed.
+    SELECT trkorr FROM e070
       WHERE as4date BETWEEN @lv_from AND @lv_to
         AND strkorr = @lv_blank
         AND ( @lv_owner    = @lv_blank OR as4user    = @lv_owner )
         AND ( @lv_status   = @lv_blank OR trstatus   = @lv_status )
         AND ( @lv_category = @lv_blank OR trfunction = @lv_category )
       ORDER BY PRIMARY KEY
-      INTO TABLE @lt_e070
+      INTO TABLE @rt_trkorr
       UP TO @lv_max ROWS.
-
-    SORT lt_e070 BY trkorr.
-    LOOP AT lt_e070 INTO ls_e070.
-      lv_id = ls_e070-trkorr.
-      APPEND lv_id TO rt_trkorr.
-    ENDLOOP.
   ENDMETHOD.
 
 

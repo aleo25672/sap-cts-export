@@ -1,25 +1,14 @@
 *&---------------------------------------------------------------------*
 *& Report ZEVO_CTS_EXTRACT_REQUESTS
 *&---------------------------------------------------------------------*
-*& Extracts transport/change requests via CTS_API_READ_CHANGE_REQUEST
-*& and downloads (or writes) a CSV file.
+*& Extracts transport/change requests and downloads (or writes) CSV.
 *&
-*& Install
-*&   1. SE38 / ADT: create executable program ZEVO_CTS_EXTRACT_REQUESTS
-*&   2. Paste this source, activate
-*&   3. Confirm CTS_OBJ components in SE11 (PGMID/OBJECT/OBJ_NAME).
-*&      If names differ, adjust FORM map_cts_object.
+*& Performance
+*&   Default: bulk read E070 / E07T / E071 (fast).
+*&   Optional: CTS_API_READ_CHANGE_REQUEST once per request (slow, API mode).
 *&
-*& CTS_API_READ_CHANGE_REQUEST (remote-enabled)
-*&   IMPORTING  REQUEST      TYPE CHAR20
-*&   EXPORTING  DESCRIPTION  TYPE TEXT60
-*&              CATEGORY     TYPE CHAR01
-*&              CLIENT       TYPE CHAR3
-*&              OWNER        TYPE CHAR012
-*&              STATUS       TYPE CHAR01
-*&              RETCODE      TYPE CHAR3
-*&              MESSAGE      TYPE TEXT80
-*&   TABLES     OBJECTS      TYPE CTS_OBJ
+*& Install: abapGit pull into ZEVO_CTS, or SE38 paste + activate.
+*& Logical file for app-server output: maintain ZEVO_CTS_EXTRACT in FILE.
 *&---------------------------------------------------------------------*
 REPORT zevo_cts_extract_requests.
 
@@ -44,8 +33,9 @@ SELECTION-SCREEN END OF BLOCK b2.
 
 SELECTION-SCREEN BEGIN OF BLOCK b3 WITH FRAME TITLE TEXT-003.
 PARAMETERS:
-  p_hdr AS CHECKBOX DEFAULT 'X',
-  p_obj AS CHECKBOX DEFAULT 'X'.
+  p_hdr   AS CHECKBOX DEFAULT 'X',
+  p_obj   AS CHECKBOX DEFAULT 'X',
+  p_usefm AS CHECKBOX DEFAULT ' '. " 1x CTS_API_READ_CHANGE_REQUEST per TR (slow)
 SELECTION-SCREEN END OF BLOCK b3.
 
 SELECTION-SCREEN BEGIN OF BLOCK b4 WITH FRAME TITLE TEXT-004.
@@ -55,59 +45,54 @@ SELECTION-SCREEN END OF BLOCK b4.
 AT SELECTION-SCREEN OUTPUT.
   LOOP AT SCREEN.
     IF screen-group1 = 'FIL'.
-      IF p_gui = abap_true.
-        screen-active = '0'.
-      ELSE.
-        screen-active = '1'.
-      ENDIF.
+      screen-active = COND #( WHEN p_gui = abap_true THEN '0' ELSE '1' ).
       MODIFY SCREEN.
     ENDIF.
   ENDLOOP.
 
-TYPES: BEGIN OF ty_header_row,
-         request     TYPE char20,
-         description TYPE text60,
-         category    TYPE char01,
-         client      TYPE char3,
-         owner       TYPE char12,
-         status      TYPE char01,
-         retcode     TYPE char3,
-         message     TYPE text80,
-       END OF ty_header_row.
+*----------------------------------------------------------------------*
+TYPES: BEGIN OF ty_e070_key,
+         trkorr     TYPE trkorr,
+         as4user    TYPE tr_as4user,
+         trfunction TYPE trfunction,
+         trstatus   TYPE trstatus,
+         as4date    TYPE as4date,
+       END OF ty_e070_key.
 
-TYPES: BEGIN OF ty_object_row,
-         request     TYPE char20,
-         description TYPE text60,
-         category    TYPE char01,
+TYPES: BEGIN OF ty_e07t,
+         trkorr  TYPE trkorr,
+         as4text TYPE as4text,
+       END OF ty_e07t.
+
+TYPES: BEGIN OF ty_e071,
+         trkorr   TYPE trkorr,
+         pgmid    TYPE pgmid,
+         object   TYPE trobjtype,
+         obj_name TYPE sobj_name,
+       END OF ty_e071.
+
+TYPES: BEGIN OF ty_csv_row,
+         request     TYPE trkorr,
+         description TYPE as4text,
+         category    TYPE trfunction,
          client      TYPE char3,
-         owner       TYPE char12,
-         status      TYPE char01,
+         owner       TYPE tr_as4user,
+         status      TYPE trstatus,
          pgmid       TYPE pgmid,
          object      TYPE trobjtype,
          obj_name    TYPE sobj_name,
          retcode     TYPE char3,
          message     TYPE text80,
-       END OF ty_object_row.
+       END OF ty_csv_row.
 
-DATA: gt_e070     TYPE STANDARD TABLE OF e070 WITH DEFAULT KEY,
-      gs_e070     TYPE e070,
-      gt_headers  TYPE STANDARD TABLE OF ty_header_row WITH DEFAULT KEY,
-      gs_header   TYPE ty_header_row,
-      gt_objects  TYPE STANDARD TABLE OF ty_object_row WITH DEFAULT KEY,
-      gs_object   TYPE ty_object_row,
-      gt_cts_obj  TYPE STANDARD TABLE OF cts_obj WITH DEFAULT KEY,
-      gs_cts_obj  TYPE cts_obj,
-      gv_desc     TYPE text60,
-      gv_category TYPE char01,
-      gv_client   TYPE char3,
-      gv_owner    TYPE char12,
-      gv_status   TYPE char01,
-      gv_retcode  TYPE char3,
-      gv_message  TYPE text80,
-      gt_csv      TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
-      gv_line     TYPE string,
-      gv_ok       TYPE i,
-      gv_fail     TYPE i.
+DATA: gt_e070 TYPE STANDARD TABLE OF ty_e070_key WITH EMPTY KEY,
+      gt_e07t TYPE HASHED TABLE OF ty_e07t WITH UNIQUE KEY trkorr,
+      gt_e071 TYPE SORTED TABLE OF ty_e071 WITH NON-UNIQUE KEY trkorr,
+      gt_csv  TYPE STANDARD TABLE OF string WITH EMPTY KEY,
+      gt_rows TYPE STANDARD TABLE OF ty_csv_row WITH EMPTY KEY,
+      gv_ok   TYPE i,
+      gv_fail TYPE i,
+      gv_line TYPE string.
 
 START-OF-SELECTION.
   PERFORM select_requests.
@@ -116,7 +101,12 @@ START-OF-SELECTION.
     RETURN.
   ENDIF.
 
-  PERFORM extract_via_cts_api.
+  IF p_usefm = abap_true.
+    PERFORM extract_via_cts_api.
+  ELSE.
+    PERFORM extract_via_tables.
+  ENDIF.
+
   PERFORM build_csv.
   PERFORM output_csv.
 
@@ -124,107 +114,261 @@ START-OF-SELECTION.
           TYPE 'S'.
 
 *&---------------------------------------------------------------------*
+*& Select only needed E070 columns; avoid OR on empty filters so indexes
+*& on AS4DATE / AS4USER stay usable.
+*&---------------------------------------------------------------------*
 FORM select_requests.
   CLEAR gt_e070.
 
   IF p_trkorr IS NOT INITIAL.
-    SELECT * FROM e070
+    SELECT trkorr, as4user, trfunction, trstatus, as4date
+      FROM e070
       WHERE trkorr  = @p_trkorr
         AND strkorr = @space
       ORDER BY PRIMARY KEY
       INTO TABLE @gt_e070
       UP TO @p_max ROWS.
-  ELSE.
-    SELECT * FROM e070
+    RETURN.
+  ENDIF.
+
+  IF p_user IS NOT INITIAL AND p_status IS NOT INITIAL AND p_funct IS NOT INITIAL.
+    SELECT trkorr, as4user, trfunction, trstatus, as4date
+      FROM e070
+      WHERE as4date    BETWEEN @p_from AND @p_to
+        AND strkorr    = @space
+        AND as4user    = @p_user
+        AND trstatus   = @p_status
+        AND trfunction = @p_funct
+      ORDER BY PRIMARY KEY
+      INTO TABLE @gt_e070
+      UP TO @p_max ROWS.
+
+  ELSEIF p_user IS NOT INITIAL AND p_status IS NOT INITIAL.
+    SELECT trkorr, as4user, trfunction, trstatus, as4date
+      FROM e070
+      WHERE as4date  BETWEEN @p_from AND @p_to
+        AND strkorr  = @space
+        AND as4user  = @p_user
+        AND trstatus = @p_status
+      ORDER BY PRIMARY KEY
+      INTO TABLE @gt_e070
+      UP TO @p_max ROWS.
+
+  ELSEIF p_user IS NOT INITIAL AND p_funct IS NOT INITIAL.
+    SELECT trkorr, as4user, trfunction, trstatus, as4date
+      FROM e070
+      WHERE as4date    BETWEEN @p_from AND @p_to
+        AND strkorr    = @space
+        AND as4user    = @p_user
+        AND trfunction = @p_funct
+      ORDER BY PRIMARY KEY
+      INTO TABLE @gt_e070
+      UP TO @p_max ROWS.
+
+  ELSEIF p_status IS NOT INITIAL AND p_funct IS NOT INITIAL.
+    SELECT trkorr, as4user, trfunction, trstatus, as4date
+      FROM e070
+      WHERE as4date    BETWEEN @p_from AND @p_to
+        AND strkorr    = @space
+        AND trstatus   = @p_status
+        AND trfunction = @p_funct
+      ORDER BY PRIMARY KEY
+      INTO TABLE @gt_e070
+      UP TO @p_max ROWS.
+
+  ELSEIF p_user IS NOT INITIAL.
+    SELECT trkorr, as4user, trfunction, trstatus, as4date
+      FROM e070
       WHERE as4date BETWEEN @p_from AND @p_to
         AND strkorr = @space
-        AND ( @p_user   = @space OR as4user    = @p_user )
-        AND ( @p_status = @space OR trstatus   = @p_status )
-        AND ( @p_funct  = @space OR trfunction = @p_funct )
+        AND as4user = @p_user
+      ORDER BY PRIMARY KEY
+      INTO TABLE @gt_e070
+      UP TO @p_max ROWS.
+
+  ELSEIF p_status IS NOT INITIAL.
+    SELECT trkorr, as4user, trfunction, trstatus, as4date
+      FROM e070
+      WHERE as4date  BETWEEN @p_from AND @p_to
+        AND strkorr  = @space
+        AND trstatus = @p_status
+      ORDER BY PRIMARY KEY
+      INTO TABLE @gt_e070
+      UP TO @p_max ROWS.
+
+  ELSEIF p_funct IS NOT INITIAL.
+    SELECT trkorr, as4user, trfunction, trstatus, as4date
+      FROM e070
+      WHERE as4date    BETWEEN @p_from AND @p_to
+        AND strkorr    = @space
+        AND trfunction = @p_funct
+      ORDER BY PRIMARY KEY
+      INTO TABLE @gt_e070
+      UP TO @p_max ROWS.
+
+  ELSE.
+    SELECT trkorr, as4user, trfunction, trstatus, as4date
+      FROM e070
+      WHERE as4date BETWEEN @p_from AND @p_to
+        AND strkorr = @space
       ORDER BY PRIMARY KEY
       INTO TABLE @gt_e070
       UP TO @p_max ROWS.
   ENDIF.
-
-  SORT gt_e070 BY trkorr.
 ENDFORM.
 
 *&---------------------------------------------------------------------*
-FORM extract_via_cts_api.
-  CLEAR: gt_headers, gt_objects, gv_ok, gv_fail.
+*& Fast path: 3 bulk SELECTs instead of N FM calls.
+*&---------------------------------------------------------------------*
+FORM extract_via_tables.
+  DATA: ls_e070    TYPE ty_e070_key,
+        ls_e07t    TYPE ty_e07t,
+        ls_e071    TYPE ty_e071,
+        ls_row     TYPE ty_csv_row,
+        lt_keys    TYPE STANDARD TABLE OF trkorr WITH EMPTY KEY,
+        lv_has_obj TYPE abap_bool.
 
-  LOOP AT gt_e070 INTO gs_e070.
-    CLEAR: gt_cts_obj, gv_desc, gv_category, gv_client,
-           gv_owner, gv_status, gv_retcode, gv_message.
+  CLEAR: gt_e07t, gt_e071, gt_rows, gv_ok, gv_fail.
 
-    CALL FUNCTION 'CTS_API_READ_CHANGE_REQUEST'
-      EXPORTING
-        request     = gs_e070-trkorr
-      IMPORTING
-        description = gv_desc
-        category    = gv_category
-        client      = gv_client
-        owner       = gv_owner
-        status      = gv_status
-        retcode     = gv_retcode
-        message     = gv_message
-      TABLES
-        objects     = gt_cts_obj.
+  LOOP AT gt_e070 INTO ls_e070.
+    APPEND ls_e070-trkorr TO lt_keys.
+  ENDLOOP.
 
-    IF gv_retcode IS NOT INITIAL AND gv_retcode <> '000'.
-      ADD 1 TO gv_fail.
-      CLEAR gs_header.
-      gs_header-request     = gs_e070-trkorr.
-      gs_header-description = gv_desc.
-      gs_header-category    = gv_category.
-      gs_header-client      = gv_client.
-      gs_header-owner       = gv_owner.
-      gs_header-status      = gv_status.
-      gs_header-retcode     = gv_retcode.
-      gs_header-message     = gv_message.
-      APPEND gs_header TO gt_headers.
-      CONTINUE.
+  IF lt_keys IS INITIAL.
+    RETURN.
+  ENDIF.
+
+  SELECT trkorr, as4text
+    FROM e07t
+    FOR ALL ENTRIES IN @lt_keys
+    WHERE trkorr = @lt_keys-table_line
+      AND langu  = @sy-langu
+    INTO TABLE @gt_e07t.
+
+  IF p_obj = abap_true.
+    SELECT trkorr, pgmid, object, obj_name
+      FROM e071
+      FOR ALL ENTRIES IN @lt_keys
+      WHERE trkorr = @lt_keys-table_line
+      INTO TABLE @gt_e071.
+  ENDIF.
+
+  LOOP AT gt_e070 INTO ls_e070.
+    CLEAR ls_row.
+    ls_row-request  = ls_e070-trkorr.
+    ls_row-category = ls_e070-trfunction.
+    ls_row-owner    = ls_e070-as4user.
+    ls_row-status   = ls_e070-trstatus.
+    ls_row-retcode  = '000'.
+
+    READ TABLE gt_e07t INTO ls_e07t WITH TABLE KEY trkorr = ls_e070-trkorr.
+    IF sy-subrc = 0.
+      ls_row-description = ls_e07t-as4text.
     ENDIF.
 
     ADD 1 TO gv_ok.
 
-    IF p_hdr = abap_true.
-      CLEAR gs_header.
-      gs_header-request     = gs_e070-trkorr.
-      gs_header-description = gv_desc.
-      gs_header-category    = gv_category.
-      gs_header-client      = gv_client.
-      gs_header-owner       = gv_owner.
-      gs_header-status      = gv_status.
-      gs_header-retcode     = gv_retcode.
-      gs_header-message     = gv_message.
-      APPEND gs_header TO gt_headers.
-    ENDIF.
-
     IF p_obj = abap_true.
-      LOOP AT gt_cts_obj INTO gs_cts_obj.
-        CLEAR gs_object.
-        gs_object-request     = gs_e070-trkorr.
-        gs_object-description = gv_desc.
-        gs_object-category    = gv_category.
-        gs_object-client      = gv_client.
-        gs_object-owner       = gv_owner.
-        gs_object-status      = gv_status.
-        gs_object-retcode     = gv_retcode.
-        gs_object-message     = gv_message.
-        PERFORM map_cts_object USING gs_cts_obj CHANGING gs_object.
-        APPEND gs_object TO gt_objects.
+      lv_has_obj = abap_false.
+      LOOP AT gt_e071 INTO ls_e071 WHERE trkorr = ls_e070-trkorr.
+        lv_has_obj = abap_true.
+        ls_row-pgmid    = ls_e071-pgmid.
+        ls_row-object   = ls_e071-object.
+        ls_row-obj_name = ls_e071-obj_name.
+        APPEND ls_row TO gt_rows.
       ENDLOOP.
+      IF lv_has_obj = abap_false AND p_hdr = abap_true.
+        CLEAR: ls_row-pgmid, ls_row-object, ls_row-obj_name.
+        APPEND ls_row TO gt_rows.
+      ENDIF.
+    ELSEIF p_hdr = abap_true.
+      APPEND ls_row TO gt_rows.
     ENDIF.
   ENDLOOP.
 ENDFORM.
 
 *&---------------------------------------------------------------------*
-*& Map CTS_OBJ components by name so minor DDIC differences are tolerated.
-*& Inspect SE11 structure CTS_OBJ on your system if mapping is empty.
+*& Slow path: CTS_API_READ_CHANGE_REQUEST once per request (API-faithful).
+*&---------------------------------------------------------------------*
+FORM extract_via_cts_api.
+  DATA: ls_e070    TYPE ty_e070_key,
+        ls_row     TYPE ty_csv_row,
+        lt_cts_obj TYPE STANDARD TABLE OF cts_obj WITH EMPTY KEY,
+        ls_cts     TYPE cts_obj,
+        lv_desc    TYPE text60,
+        lv_cat     TYPE char01,
+        lv_client  TYPE char3,
+        lv_owner   TYPE char12,
+        lv_status  TYPE char01,
+        lv_ret     TYPE char3,
+        lv_msg     TYPE text80,
+        lv_total   TYPE i,
+        lv_idx     TYPE i.
+
+  CLEAR: gt_rows, gv_ok, gv_fail.
+  lv_total = lines( gt_e070 ).
+
+  LOOP AT gt_e070 INTO ls_e070.
+    lv_idx = lv_idx + 1.
+    IF lv_total > 0 AND ( lv_idx = 1 OR lv_idx MOD 10 = 0 OR lv_idx = lv_total ).
+      DATA(lv_pct) = ( lv_idx * 100 ) DIV lv_total.
+      CALL FUNCTION 'SAPGUI_PROGRESS_INDICATOR'
+        EXPORTING
+          percentage = lv_pct
+          text       = |CTS API { lv_idx } / { lv_total }|.
+    ENDIF.
+
+    CLEAR: lt_cts_obj, lv_desc, lv_cat, lv_client, lv_owner, lv_status, lv_ret, lv_msg.
+
+    CALL FUNCTION 'CTS_API_READ_CHANGE_REQUEST'
+      EXPORTING
+        request     = ls_e070-trkorr
+      IMPORTING
+        description = lv_desc
+        category    = lv_cat
+        client      = lv_client
+        owner       = lv_owner
+        status      = lv_status
+        retcode     = lv_ret
+        message     = lv_msg
+      TABLES
+        objects     = lt_cts_obj.
+
+    CLEAR ls_row.
+    ls_row-request     = ls_e070-trkorr.
+    ls_row-description = lv_desc.
+    ls_row-category    = lv_cat.
+    ls_row-client      = lv_client.
+    ls_row-owner       = lv_owner.
+    ls_row-status      = lv_status.
+    ls_row-retcode     = lv_ret.
+    ls_row-message     = lv_msg.
+
+    IF lv_ret IS NOT INITIAL AND lv_ret <> '000'.
+      ADD 1 TO gv_fail.
+      IF p_hdr = abap_true OR p_obj = abap_true.
+        APPEND ls_row TO gt_rows.
+      ENDIF.
+      CONTINUE.
+    ENDIF.
+
+    ADD 1 TO gv_ok.
+
+    IF p_obj = abap_true AND lt_cts_obj IS NOT INITIAL.
+      LOOP AT lt_cts_obj INTO ls_cts.
+        PERFORM map_cts_object USING ls_cts CHANGING ls_row.
+        APPEND ls_row TO gt_rows.
+      ENDLOOP.
+    ELSEIF p_hdr = abap_true.
+      CLEAR: ls_row-pgmid, ls_row-object, ls_row-obj_name.
+      APPEND ls_row TO gt_rows.
+    ENDIF.
+  ENDLOOP.
+ENDFORM.
+
 *&---------------------------------------------------------------------*
 FORM map_cts_object USING    is_cts TYPE cts_obj
-                    CHANGING cs_row TYPE ty_object_row.
+                    CHANGING cs_row TYPE ty_csv_row.
   FIELD-SYMBOLS: <pgmid>    TYPE any,
                  <object>   TYPE any,
                  <obj_name> TYPE any,
@@ -234,12 +378,10 @@ FORM map_cts_object USING    is_cts TYPE cts_obj
   IF <pgmid> IS ASSIGNED.
     cs_row-pgmid = <pgmid>.
   ENDIF.
-
   ASSIGN COMPONENT 'OBJECT' OF STRUCTURE is_cts TO <object>.
   IF <object> IS ASSIGNED.
     cs_row-object = <object>.
   ENDIF.
-
   ASSIGN COMPONENT 'OBJ_NAME' OF STRUCTURE is_cts TO <obj_name>.
   IF <obj_name> IS ASSIGNED.
     cs_row-obj_name = <obj_name>.
@@ -253,42 +395,41 @@ ENDFORM.
 
 *&---------------------------------------------------------------------*
 FORM build_csv.
-  DATA: lv_desc TYPE text60,
+  DATA: ls_row  TYPE ty_csv_row,
+        lv_desc TYPE as4text,
         lv_msg  TYPE text80,
         lv_name TYPE sobj_name.
 
   CLEAR gt_csv.
-
-  IF p_obj = abap_true AND gt_objects IS NOT INITIAL.
-    gv_line = |REQUEST,DESCRIPTION,CATEGORY,CLIENT,OWNER,STATUS,PGMID,OBJECT,OBJ_NAME,RETCODE,MESSAGE|.
-    APPEND gv_line TO gt_csv.
-    LOOP AT gt_objects INTO gs_object.
-      lv_desc = gs_object-description.
-      lv_msg  = gs_object-message.
-      lv_name = gs_object-obj_name.
-      PERFORM csv_escape CHANGING lv_desc.
-      PERFORM csv_escape CHANGING lv_msg.
-      PERFORM csv_escape CHANGING lv_name.
-      gv_line = |{ gs_object-request },{ lv_desc },{ gs_object-category },| &&
-                |{ gs_object-client },{ gs_object-owner },{ gs_object-status },| &&
-                |{ gs_object-pgmid },{ gs_object-object },{ lv_name },| &&
-                |{ gs_object-retcode },{ lv_msg }|.
-      APPEND gv_line TO gt_csv.
-    ENDLOOP.
-  ELSEIF p_hdr = abap_true.
-    gv_line = |REQUEST,DESCRIPTION,CATEGORY,CLIENT,OWNER,STATUS,RETCODE,MESSAGE|.
-    APPEND gv_line TO gt_csv.
-    LOOP AT gt_headers INTO gs_header.
-      lv_desc = gs_header-description.
-      lv_msg  = gs_header-message.
-      PERFORM csv_escape CHANGING lv_desc.
-      PERFORM csv_escape CHANGING lv_msg.
-      gv_line = |{ gs_header-request },{ lv_desc },{ gs_header-category },| &&
-                |{ gs_header-client },{ gs_header-owner },{ gs_header-status },| &&
-                |{ gs_header-retcode },{ lv_msg }|.
-      APPEND gv_line TO gt_csv.
-    ENDLOOP.
+  IF gt_rows IS INITIAL.
+    RETURN.
   ENDIF.
+
+  IF p_obj = abap_true.
+    APPEND |REQUEST,DESCRIPTION,CATEGORY,CLIENT,OWNER,STATUS,PGMID,OBJECT,OBJ_NAME,RETCODE,MESSAGE|
+      TO gt_csv.
+  ELSE.
+    APPEND |REQUEST,DESCRIPTION,CATEGORY,CLIENT,OWNER,STATUS,RETCODE,MESSAGE|
+      TO gt_csv.
+  ENDIF.
+
+  LOOP AT gt_rows INTO ls_row.
+    lv_desc = ls_row-description.
+    lv_msg  = ls_row-message.
+    lv_name = ls_row-obj_name.
+    PERFORM csv_escape CHANGING lv_desc.
+    PERFORM csv_escape CHANGING lv_msg.
+    IF p_obj = abap_true.
+      PERFORM csv_escape CHANGING lv_name.
+      gv_line = |{ ls_row-request },{ lv_desc },{ ls_row-category },{ ls_row-client },| &&
+                |{ ls_row-owner },{ ls_row-status },{ ls_row-pgmid },{ ls_row-object },| &&
+                |{ lv_name },{ ls_row-retcode },{ lv_msg }|.
+    ELSE.
+      gv_line = |{ ls_row-request },{ lv_desc },{ ls_row-category },{ ls_row-client },| &&
+                |{ ls_row-owner },{ ls_row-status },{ ls_row-retcode },{ lv_msg }|.
+    ENDIF.
+    APPEND gv_line TO gt_csv.
+  ENDLOOP.
 ENDFORM.
 
 *&---------------------------------------------------------------------*
@@ -317,14 +458,12 @@ FORM resolve_appserver_path CHANGING cv_path TYPE string.
 
   lv_logical = p_lfile.
   IF lv_logical IS INITIAL.
-    MESSAGE 'Enter a logical file name (transaction FILE) or a physical path.'
-            TYPE 'E'.
+    MESSAGE 'Enter a logical file name (transaction FILE) or a physical path.' TYPE 'E'.
   ENDIF.
 
   lv_param1 = |{ sy-datum }|.
   lv_param2 = |{ sy-uzeit }|.
 
-  " Resolve via transaction FILE (logical file → physical path)
   CALL FUNCTION 'FILE_GET_NAME'
     EXPORTING
       logical_filename = lv_logical
@@ -337,8 +476,7 @@ FORM resolve_appserver_path CHANGING cv_path TYPE string.
       file_not_found   = 1
       OTHERS           = 2.
   IF sy-subrc <> 0 OR lv_phys IS INITIAL.
-    MESSAGE |Logical file { lv_logical } not found. Maintain it in transaction FILE.|
-            TYPE 'E'.
+    MESSAGE |Logical file { lv_logical } not found. Maintain it in transaction FILE.| TYPE 'E'.
   ENDIF.
 
   cv_path = lv_phys.
