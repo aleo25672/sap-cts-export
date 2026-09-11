@@ -4,9 +4,9 @@ Exposes `CTS_API_READ_CHANGE_REQUEST` over **HTTP** so clients (including the No
 
 ## Install
 
-1. Create class **`ZEVO_CTS_EXTRACT_ICF`** (public, final) in SE24 / ADT and paste [`zevo_cts_extract_icf.clas.abap`](./zevo_cts_extract_icf.clas.abap).
+1. Pull this repo with **abapGit** into package `ZEVO_CTS` (see [`README.md`](./README.md)), **or** create class **`ZEVO_CTS_EXTRACT_ICF`** in SE24 / ADT and paste [`src/zevo_cts_extract_icf.clas.abap`](./src/zevo_cts_extract_icf.clas.abap).
 2. Activate (requires **`/UI2/CL_JSON`**).
-3. **SICF** → `default_host` → `sap` → `bc` → create service **`zevo_cts_extract`**.
+3. **SICF** → `default_host` → `sap` → `bc` → create service **`zevo_cts_extract`** (SICF is not part of the abapGit dump — create once).
 4. Handler List → `ZEVO_CTS_EXTRACT_ICF`.
 5. Configure logon (Basic Auth recommended for machine users).
 6. Activate the service.

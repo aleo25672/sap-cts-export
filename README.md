@@ -4,9 +4,11 @@ Three ways to pull SAP transport / change requests through **`CTS_API_READ_CHANG
 
 | # | Option | Path | When to use |
 |---|--------|------|-------------|
-| **1** | **Pure ABAP report** | [`abap/zevo_cts_extract_requests.abap`](./abap/zevo_cts_extract_requests.abap) | Run inside SAP (SE38); GUI download or app-server file |
+| **1** | **Pure ABAP report** | [`abap/src/zevo_cts_extract_requests.prog.abap`](./abap/src/zevo_cts_extract_requests.prog.abap) | Run inside SAP (SE38 / abapGit); GUI download or app-server file |
 | **2** | **Node + RFC adapter** | [`node-app/`](./node-app/) with `CTS_ADAPTER=rfc` | Direct RFC from Node via `node-rfc` + NWRFC SDK |
-| **3** | **ABAP ICF + Node HTTP** | [`abap/zevo_cts_extract_icf.clas.abap`](./abap/zevo_cts_extract_icf.clas.abap) + `CTS_ADAPTER=http` | HTTPS to a custom SICF service that wraps the FM |
+| **3** | **ABAP ICF + Node HTTP** | [`abap/src/zevo_cts_extract_icf.clas.abap`](./abap/src/zevo_cts_extract_icf.clas.abap) + `CTS_ADAPTER=http` | HTTPS to a custom SICF service that wraps the FM |
+
+ABAP objects are packaged for **[abapGit](https://docs.abapgit.org/)** (`.abapgit.xml` + `abap/src/*.prog.xml` / `*.clas.xml`). See [`abap/README.md`](./abap/README.md).
 
 ```text
 1) SE38 report  →  CTS_API_READ_CHANGE_REQUEST  →  CSV
@@ -30,7 +32,10 @@ The FM reads **one** request. All options resolve a list of IDs (from `E070` or 
 
 ## Option 1 — Pure ABAP
 
-See [`abap/README.md`](./abap/README.md). Paste the report into `ZEVO_CTS_EXTRACT_REQUESTS` and activate.
+See [`abap/README.md`](./abap/README.md).
+
+**abapGit (preferred):** online pull or offline ZIP into package `ZEVO_CTS`.  
+**Manual:** paste [`abap/src/zevo_cts_extract_requests.prog.abap`](./abap/src/zevo_cts_extract_requests.prog.abap) into program `ZEVO_CTS_EXTRACT_REQUESTS`.
 
 ---
 
@@ -51,7 +56,7 @@ Requires NWRFC SDK, network to the app server, and an RFC user that can call the
 
 ## Option 3 — Custom ABAP ICF + Node HTTP adapter
 
-1. Install the ICF handler: [`abap/ICF.md`](./abap/ICF.md) / [`abap/zevo_cts_extract_icf.clas.abap`](./abap/zevo_cts_extract_icf.clas.abap)
+1. Install ABAP via abapGit (or paste the class), then wire SICF: [`abap/ICF.md`](./abap/ICF.md) / [`abap/src/zevo_cts_extract_icf.clas.abap`](./abap/src/zevo_cts_extract_icf.clas.abap)
 2. Point Node at it:
 
 ```bash
