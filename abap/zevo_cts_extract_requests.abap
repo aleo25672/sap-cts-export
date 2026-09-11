@@ -1,11 +1,11 @@
 *&---------------------------------------------------------------------*
-*& Report EVO_CTS_EXTRACT_REQUESTS
+*& Report ZEVO_CTS_EXTRACT_REQUESTS
 *&---------------------------------------------------------------------*
 *& Extracts transport/change requests via CTS_API_READ_CHANGE_REQUEST
 *& and downloads (or writes) a CSV file.
 *&
 *& Install
-*&   1. SE38 / ADT: create executable program EVO_CTS_EXTRACT_REQUESTS
+*&   1. SE38 / ADT: create executable program ZEVO_CTS_EXTRACT_REQUESTS
 *&   2. Paste this source, activate
 *&   3. Confirm CTS_OBJ components in SE11 (PGMID/OBJECT/OBJ_NAME).
 *&      If names differ, adjust FORM map_cts_object.
@@ -21,7 +21,7 @@
 *&              MESSAGE      TYPE TEXT80
 *&   TABLES     OBJECTS      TYPE CTS_OBJ
 *&---------------------------------------------------------------------*
-REPORT evo_cts_extract_requests.
+REPORT zevo_cts_extract_requests.
 
 SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME.
 SELECTION-SCREEN COMMENT /1(79) c_b1.

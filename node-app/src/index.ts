@@ -52,10 +52,10 @@ app.get("/api/health", (_req, res) => {
 });
 
 /**
- * Local stand-in for /sap/bc/evo_cts_extract so CTS_ADAPTER=http can be demoed
- * without a live SAP system. Same JSON contract as EVO_CTS_EXTRACT_ICF.
+ * Local stand-in for /sap/bc/zevo_cts_extract so CTS_ADAPTER=http can be demoed
+ * without a live SAP system. Same JSON contract as ZEVO_CTS_EXTRACT_ICF.
  */
-app.post("/sap/bc/evo_cts_extract", async (req, res) => {
+app.post("/sap/bc/zevo_cts_extract", async (req, res) => {
   try {
     const filters = parseBody(req.body ?? {});
     const result = await new MockAdapter().extract(filters);
@@ -73,7 +73,7 @@ app.post("/sap/bc/evo_cts_extract", async (req, res) => {
   }
 });
 
-app.get("/sap/bc/evo_cts_extract", async (req, res) => {
+app.get("/sap/bc/zevo_cts_extract", async (req, res) => {
   try {
     const q = req.query as Record<string, unknown>;
     const filters = parseBody({

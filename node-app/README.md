@@ -18,7 +18,7 @@ UI: http://127.0.0.1:43127
 |---------------|-------|-------|
 | `mock` | nothing | sample JSON |
 | `rfc` | NWRFC SDK + `node-rfc` | `CTS_API_READ_CHANGE_REQUEST` over RFC |
-| `http` | `CTS_HTTP_URL` (+ Basic/Bearer) | ABAP ICF `EVO_CTS_EXTRACT_ICF` over HTTPS |
+| `http` | `CTS_HTTP_URL` (+ Basic/Bearer) | ABAP ICF `ZEVO_CTS_EXTRACT_ICF` over HTTPS |
 
 ### RFC
 
@@ -38,16 +38,16 @@ Point at the real SICF service (see [`../abap/ICF.md`](../abap/ICF.md)):
 
 ```bash
 CTS_ADAPTER=http
-CTS_HTTP_URL=https://sap.example.com:44300/sap/bc/evo_cts_extract?sap-client=100
+CTS_HTTP_URL=https://sap.example.com:44300/sap/bc/zevo_cts_extract?sap-client=100
 CTS_HTTP_USER=...
 CTS_HTTP_PASSWD=...
 ```
 
-Or demo the ICF contract locally (same Node process mocks `/sap/bc/evo_cts_extract`):
+Or demo the ICF contract locally (same Node process mocks `/sap/bc/zevo_cts_extract`):
 
 ```bash
 CTS_ADAPTER=http
-CTS_HTTP_URL=http://127.0.0.1:43127/sap/bc/evo_cts_extract
+CTS_HTTP_URL=http://127.0.0.1:43127/sap/bc/zevo_cts_extract
 ```
 
 ## Scripts
