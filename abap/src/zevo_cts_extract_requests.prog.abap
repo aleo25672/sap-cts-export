@@ -22,6 +22,8 @@ TYPES: BEGIN OF ty_e070_key,
          trfunction TYPE trfunction,
          trstatus   TYPE trstatus,
          as4date    TYPE as4date,
+         as4time    TYPE as4time,
+         tarsystem  TYPE tr_target,
        END OF ty_e070_key.
 
 TYPES: BEGIN OF ty_e07t,
@@ -43,6 +45,9 @@ TYPES: BEGIN OF ty_csv_row,
          client      TYPE char3,
          owner       TYPE tr_as4user,
          status      TYPE trstatus,
+         as4date     TYPE as4date,
+         as4time     TYPE as4time,
+         tarsystem   TYPE tr_target,
          pgmid       TYPE pgmid,
          object      TYPE trobjtype,
          obj_name    TYPE sobj_name,
@@ -151,7 +156,7 @@ FORM select_requests.
   CLEAR gt_e070.
 
   IF p_trkorr IS NOT INITIAL.
-    SELECT trkorr, as4user, trfunction, trstatus, as4date
+    SELECT trkorr, as4user, trfunction, trstatus, as4date, as4time, tarsystem
       FROM e070
       WHERE trkorr  = @p_trkorr
         AND strkorr = @space
@@ -162,7 +167,7 @@ FORM select_requests.
   ENDIF.
 
   IF p_user IS NOT INITIAL AND p_status IS NOT INITIAL AND p_funct IS NOT INITIAL.
-    SELECT trkorr, as4user, trfunction, trstatus, as4date
+    SELECT trkorr, as4user, trfunction, trstatus, as4date, as4time, tarsystem
       FROM e070
       WHERE as4date    BETWEEN @p_from AND @p_to
         AND strkorr    = @space
@@ -174,7 +179,7 @@ FORM select_requests.
       UP TO @p_max ROWS.
 
   ELSEIF p_user IS NOT INITIAL AND p_status IS NOT INITIAL.
-    SELECT trkorr, as4user, trfunction, trstatus, as4date
+    SELECT trkorr, as4user, trfunction, trstatus, as4date, as4time, tarsystem
       FROM e070
       WHERE as4date  BETWEEN @p_from AND @p_to
         AND strkorr  = @space
@@ -185,7 +190,7 @@ FORM select_requests.
       UP TO @p_max ROWS.
 
   ELSEIF p_user IS NOT INITIAL AND p_funct IS NOT INITIAL.
-    SELECT trkorr, as4user, trfunction, trstatus, as4date
+    SELECT trkorr, as4user, trfunction, trstatus, as4date, as4time, tarsystem
       FROM e070
       WHERE as4date    BETWEEN @p_from AND @p_to
         AND strkorr    = @space
@@ -196,7 +201,7 @@ FORM select_requests.
       UP TO @p_max ROWS.
 
   ELSEIF p_status IS NOT INITIAL AND p_funct IS NOT INITIAL.
-    SELECT trkorr, as4user, trfunction, trstatus, as4date
+    SELECT trkorr, as4user, trfunction, trstatus, as4date, as4time, tarsystem
       FROM e070
       WHERE as4date    BETWEEN @p_from AND @p_to
         AND strkorr    = @space
@@ -207,7 +212,7 @@ FORM select_requests.
       UP TO @p_max ROWS.
 
   ELSEIF p_user IS NOT INITIAL.
-    SELECT trkorr, as4user, trfunction, trstatus, as4date
+    SELECT trkorr, as4user, trfunction, trstatus, as4date, as4time, tarsystem
       FROM e070
       WHERE as4date BETWEEN @p_from AND @p_to
         AND strkorr = @space
@@ -217,7 +222,7 @@ FORM select_requests.
       UP TO @p_max ROWS.
 
   ELSEIF p_status IS NOT INITIAL.
-    SELECT trkorr, as4user, trfunction, trstatus, as4date
+    SELECT trkorr, as4user, trfunction, trstatus, as4date, as4time, tarsystem
       FROM e070
       WHERE as4date  BETWEEN @p_from AND @p_to
         AND strkorr  = @space
@@ -227,7 +232,7 @@ FORM select_requests.
       UP TO @p_max ROWS.
 
   ELSEIF p_funct IS NOT INITIAL.
-    SELECT trkorr, as4user, trfunction, trstatus, as4date
+    SELECT trkorr, as4user, trfunction, trstatus, as4date, as4time, tarsystem
       FROM e070
       WHERE as4date    BETWEEN @p_from AND @p_to
         AND strkorr    = @space
@@ -237,7 +242,7 @@ FORM select_requests.
       UP TO @p_max ROWS.
 
   ELSE.
-    SELECT trkorr, as4user, trfunction, trstatus, as4date
+    SELECT trkorr, as4user, trfunction, trstatus, as4date, as4time, tarsystem
       FROM e070
       WHERE as4date BETWEEN @p_from AND @p_to
         AND strkorr = @space
@@ -285,11 +290,14 @@ FORM extract_via_tables.
 
   LOOP AT gt_e070 INTO ls_e070.
     CLEAR ls_row.
-    ls_row-request  = ls_e070-trkorr.
-    ls_row-category = ls_e070-trfunction.
-    ls_row-owner    = ls_e070-as4user.
-    ls_row-status   = ls_e070-trstatus.
-    ls_row-retcode  = '000'.
+    ls_row-request   = ls_e070-trkorr.
+    ls_row-category  = ls_e070-trfunction.
+    ls_row-owner     = ls_e070-as4user.
+    ls_row-status    = ls_e070-trstatus.
+    ls_row-as4date   = ls_e070-as4date.
+    ls_row-as4time   = ls_e070-as4time.
+    ls_row-tarsystem = ls_e070-tarsystem.
+    ls_row-retcode   = '000'.
 
     READ TABLE gt_e07t INTO ls_e07t WITH TABLE KEY trkorr = ls_e070-trkorr.
     IF sy-subrc = 0.
@@ -372,6 +380,9 @@ FORM extract_via_cts_api.
     ls_row-client      = lv_client.
     ls_row-owner       = lv_owner.
     ls_row-status      = lv_status.
+    ls_row-as4date     = ls_e070-as4date.
+    ls_row-as4time     = ls_e070-as4time.
+    ls_row-tarsystem   = ls_e070-tarsystem.
     ls_row-retcode     = lv_ret.
     ls_row-message     = lv_msg.
 
@@ -437,10 +448,10 @@ FORM build_csv.
   ENDIF.
 
   IF p_obj = abap_true.
-    APPEND |REQUEST,DESCRIPTION,CATEGORY,CLIENT,OWNER,STATUS,PGMID,OBJECT,OBJ_NAME,RETCODE,MESSAGE|
+    APPEND |REQUEST,DESCRIPTION,CATEGORY,CLIENT,OWNER,STATUS,AS4DATE,AS4TIME,TARSYSTEM,PGMID,OBJECT,OBJ_NAME,RETCODE,MESSAGE|
       TO gt_csv.
   ELSE.
-    APPEND |REQUEST,DESCRIPTION,CATEGORY,CLIENT,OWNER,STATUS,RETCODE,MESSAGE|
+    APPEND |REQUEST,DESCRIPTION,CATEGORY,CLIENT,OWNER,STATUS,AS4DATE,AS4TIME,TARSYSTEM,RETCODE,MESSAGE|
       TO gt_csv.
   ENDIF.
 
@@ -453,11 +464,13 @@ FORM build_csv.
     IF p_obj = abap_true.
       PERFORM csv_escape CHANGING lv_name.
       gv_line = |{ ls_row-request },{ lv_desc },{ ls_row-category },{ ls_row-client },| &&
-                |{ ls_row-owner },{ ls_row-status },{ ls_row-pgmid },{ ls_row-object },| &&
+                |{ ls_row-owner },{ ls_row-status },{ ls_row-as4date },{ ls_row-as4time },| &&
+                |{ ls_row-tarsystem },{ ls_row-pgmid },{ ls_row-object },| &&
                 |{ lv_name },{ ls_row-retcode },{ lv_msg }|.
     ELSE.
       gv_line = |{ ls_row-request },{ lv_desc },{ ls_row-category },{ ls_row-client },| &&
-                |{ ls_row-owner },{ ls_row-status },{ ls_row-retcode },{ lv_msg }|.
+                |{ ls_row-owner },{ ls_row-status },{ ls_row-as4date },{ ls_row-as4time },| &&
+                |{ ls_row-tarsystem },{ ls_row-retcode },{ lv_msg }|.
     ENDIF.
     APPEND gv_line TO gt_csv.
   ENDLOOP.

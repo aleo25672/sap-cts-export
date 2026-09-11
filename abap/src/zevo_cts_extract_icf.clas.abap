@@ -62,6 +62,9 @@ CLASS zevo_cts_extract_icf DEFINITION
              client      TYPE string,
              owner       TYPE string,
              status      TYPE string,
+             as4date     TYPE string,
+             as4time     TYPE string,
+             tarsystem   TYPE string,
              retcode     TYPE string,
              message     TYPE string,
              objects     TYPE tty_object,
@@ -74,6 +77,8 @@ CLASS zevo_cts_extract_icf DEFINITION
              trfunction TYPE trfunction,
              trstatus   TYPE trstatus,
              as4date    TYPE as4date,
+             as4time    TYPE as4time,
+             tarsystem  TYPE tr_target,
            END OF ty_e070_key.
     TYPES tty_e070 TYPE STANDARD TABLE OF ty_e070_key WITH EMPTY KEY.
 
@@ -438,7 +443,7 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
       IF lt_keys IS INITIAL.
         RETURN.
       ENDIF.
-      SELECT trkorr, as4user, trfunction, trstatus, as4date
+      SELECT trkorr, as4user, trfunction, trstatus, as4date, as4time, tarsystem
         FROM e070
         FOR ALL ENTRIES IN @lt_keys
         WHERE trkorr  = @lt_keys-table_line
@@ -467,7 +472,7 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
 
     " Avoid OR on empty filters so AS4DATE / AS4USER indexes stay usable.
     IF lv_owner IS NOT INITIAL AND lv_status IS NOT INITIAL AND lv_category IS NOT INITIAL.
-      SELECT trkorr, as4user, trfunction, trstatus, as4date
+      SELECT trkorr, as4user, trfunction, trstatus, as4date, as4time, tarsystem
         FROM e070
         WHERE as4date    BETWEEN @lv_from AND @lv_to
           AND strkorr    = @space
@@ -479,7 +484,7 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
         UP TO @lv_max ROWS.
 
     ELSEIF lv_owner IS NOT INITIAL AND lv_status IS NOT INITIAL.
-      SELECT trkorr, as4user, trfunction, trstatus, as4date
+      SELECT trkorr, as4user, trfunction, trstatus, as4date, as4time, tarsystem
         FROM e070
         WHERE as4date  BETWEEN @lv_from AND @lv_to
           AND strkorr  = @space
@@ -490,7 +495,7 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
         UP TO @lv_max ROWS.
 
     ELSEIF lv_owner IS NOT INITIAL AND lv_category IS NOT INITIAL.
-      SELECT trkorr, as4user, trfunction, trstatus, as4date
+      SELECT trkorr, as4user, trfunction, trstatus, as4date, as4time, tarsystem
         FROM e070
         WHERE as4date    BETWEEN @lv_from AND @lv_to
           AND strkorr    = @space
@@ -501,7 +506,7 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
         UP TO @lv_max ROWS.
 
     ELSEIF lv_status IS NOT INITIAL AND lv_category IS NOT INITIAL.
-      SELECT trkorr, as4user, trfunction, trstatus, as4date
+      SELECT trkorr, as4user, trfunction, trstatus, as4date, as4time, tarsystem
         FROM e070
         WHERE as4date    BETWEEN @lv_from AND @lv_to
           AND strkorr    = @space
@@ -512,7 +517,7 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
         UP TO @lv_max ROWS.
 
     ELSEIF lv_owner IS NOT INITIAL.
-      SELECT trkorr, as4user, trfunction, trstatus, as4date
+      SELECT trkorr, as4user, trfunction, trstatus, as4date, as4time, tarsystem
         FROM e070
         WHERE as4date BETWEEN @lv_from AND @lv_to
           AND strkorr = @space
@@ -522,7 +527,7 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
         UP TO @lv_max ROWS.
 
     ELSEIF lv_status IS NOT INITIAL.
-      SELECT trkorr, as4user, trfunction, trstatus, as4date
+      SELECT trkorr, as4user, trfunction, trstatus, as4date, as4time, tarsystem
         FROM e070
         WHERE as4date  BETWEEN @lv_from AND @lv_to
           AND strkorr  = @space
@@ -532,7 +537,7 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
         UP TO @lv_max ROWS.
 
     ELSEIF lv_category IS NOT INITIAL.
-      SELECT trkorr, as4user, trfunction, trstatus, as4date
+      SELECT trkorr, as4user, trfunction, trstatus, as4date, as4time, tarsystem
         FROM e070
         WHERE as4date    BETWEEN @lv_from AND @lv_to
           AND strkorr    = @space
@@ -542,7 +547,7 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
         UP TO @lv_max ROWS.
 
     ELSE.
-      SELECT trkorr, as4user, trfunction, trstatus, as4date
+      SELECT trkorr, as4user, trfunction, trstatus, as4date, as4time, tarsystem
         FROM e070
         WHERE as4date BETWEEN @lv_from AND @lv_to
           AND strkorr = @space
@@ -589,11 +594,14 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
 
     LOOP AT it_e070 INTO ls_e070.
       CLEAR ls_req.
-      ls_req-request  = ls_e070-trkorr.
-      ls_req-category = ls_e070-trfunction.
-      ls_req-owner    = ls_e070-as4user.
-      ls_req-status   = ls_e070-trstatus.
-      ls_req-retcode  = '000'.
+      ls_req-request   = ls_e070-trkorr.
+      ls_req-category  = ls_e070-trfunction.
+      ls_req-owner     = ls_e070-as4user.
+      ls_req-status    = ls_e070-trstatus.
+      ls_req-as4date   = ls_e070-as4date.
+      ls_req-as4time   = ls_e070-as4time.
+      ls_req-tarsystem = ls_e070-tarsystem.
+      ls_req-retcode   = '000'.
 
       READ TABLE lt_e07t INTO ls_e07t WITH TABLE KEY trkorr = ls_e070-trkorr.
       IF sy-subrc = 0.
@@ -625,6 +633,10 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
     LOOP AT it_e070 INTO ls_e070.
       CLEAR ls_request.
       ls_request = read_change_request( ls_e070-trkorr ).
+      " FM has no date/time — keep E070 header attributes
+      ls_request-as4date   = ls_e070-as4date.
+      ls_request-as4time   = ls_e070-as4time.
+      ls_request-tarsystem = ls_e070-tarsystem.
       IF is_filters-include_objects = abap_false.
         CLEAR ls_request-objects.
       ENDIF.
@@ -743,14 +755,15 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
           lt_lines TYPE string_table.
 
     APPEND
-      |REQUEST,DESCRIPTION,CATEGORY,CLIENT,OWNER,STATUS,PGMID,OBJECT,OBJ_NAME,RETCODE,MESSAGE|
+      |REQUEST,DESCRIPTION,CATEGORY,CLIENT,OWNER,STATUS,AS4DATE,AS4TIME,TARSYSTEM,PGMID,OBJECT,OBJ_NAME,RETCODE,MESSAGE|
       TO lt_lines.
 
     LOOP AT it_requests INTO ls_req.
       IF ls_req-objects IS INITIAL.
         lv_line =
           |{ ls_req-request },{ csv_quote( ls_req-description ) },{ ls_req-category },| &&
-          |{ ls_req-client },{ ls_req-owner },{ ls_req-status },,,,| &&
+          |{ ls_req-client },{ ls_req-owner },{ ls_req-status },| &&
+          |{ ls_req-as4date },{ ls_req-as4time },{ ls_req-tarsystem },,,,| &&
           |{ ls_req-retcode },{ csv_quote( ls_req-message ) }|.
         APPEND lv_line TO lt_lines.
         CONTINUE.
@@ -760,6 +773,7 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
         lv_line =
           |{ ls_req-request },{ csv_quote( ls_req-description ) },{ ls_req-category },| &&
           |{ ls_req-client },{ ls_req-owner },{ ls_req-status },| &&
+          |{ ls_req-as4date },{ ls_req-as4time },{ ls_req-tarsystem },| &&
           |{ ls_obj-pgmid },{ ls_obj-object },{ csv_quote( ls_obj-obj_name ) },| &&
           |{ ls_req-retcode },{ csv_quote( ls_req-message ) }|.
         APPEND lv_line TO lt_lines.

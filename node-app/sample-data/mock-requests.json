@@ -10,10 +10,24 @@
     "message": "",
     "as4date": "20260315",
     "objects": [
-      { "pgmid": "R3TR", "object": "CLAS", "objName": "ZCL_PRICING_HELPER" },
-      { "pgmid": "R3TR", "object": "TABL", "objName": "ZPRC_COND_EXT" },
-      { "pgmid": "LIMU", "object": "METH", "objName": "ZCL_PRICING_HELPER=============CM001" }
-    ]
+      {
+        "pgmid": "R3TR",
+        "object": "CLAS",
+        "objName": "ZCL_PRICING_HELPER"
+      },
+      {
+        "pgmid": "R3TR",
+        "object": "TABL",
+        "objName": "ZPRC_COND_EXT"
+      },
+      {
+        "pgmid": "LIMU",
+        "object": "METH",
+        "objName": "ZCL_PRICING_HELPER=============CM001"
+      }
+    ],
+    "as4time": "103015",
+    "tarsystem": "S4Q"
   },
   {
     "request": "S4HK900124",
@@ -26,9 +40,19 @@
     "message": "",
     "as4date": "20260318",
     "objects": [
-      { "pgmid": "R3TR", "object": "TABU", "objName": "T052" },
-      { "pgmid": "R3TR", "object": "TABU", "objName": "T001" }
-    ]
+      {
+        "pgmid": "R3TR",
+        "object": "TABU",
+        "objName": "T052"
+      },
+      {
+        "pgmid": "R3TR",
+        "object": "TABU",
+        "objName": "T001"
+      }
+    ],
+    "as4time": "141200",
+    "tarsystem": "S4Q"
   },
   {
     "request": "S4HK900130",
@@ -41,13 +65,23 @@
     "message": "",
     "as4date": "20260401",
     "objects": [
-      { "pgmid": "R3TR", "object": "SSFO", "objName": "ZSD_INVOICE_FORM" },
-      { "pgmid": "R3TR", "object": "PROG", "objName": "ZSD_PRINT_DRIVER" }
-    ]
+      {
+        "pgmid": "R3TR",
+        "object": "SSFO",
+        "objName": "ZSD_INVOICE_FORM"
+      },
+      {
+        "pgmid": "R3TR",
+        "object": "PROG",
+        "objName": "ZSD_PRINT_DRIVER"
+      }
+    ],
+    "as4time": "090500",
+    "tarsystem": "S4D"
   },
   {
     "request": "S4HK900131",
-    "description": "Transport of copies — hotfix pack",
+    "description": "Transport of copies \u2014 hotfix pack",
     "category": "T",
     "client": "100",
     "owner": "BASIS",
@@ -56,8 +90,14 @@
     "message": "",
     "as4date": "20260402",
     "objects": [
-      { "pgmid": "R3TR", "object": "PROG", "objName": "ZFIX_INVOICE_CHECK" }
-    ]
+      {
+        "pgmid": "R3TR",
+        "object": "PROG",
+        "objName": "ZFIX_INVOICE_CHECK"
+      }
+    ],
+    "as4time": "163045",
+    "tarsystem": "S4Q"
   },
   {
     "request": "S4HK900199",
@@ -69,6 +109,8 @@
     "retcode": "008",
     "message": "Change request does not exist",
     "as4date": "20260101",
-    "objects": []
+    "objects": [],
+    "as4time": "080000",
+    "tarsystem": ""
   }
 ]

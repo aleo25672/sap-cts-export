@@ -20,6 +20,9 @@ type IcfRequest = {
   client?: string;
   owner?: string;
   status?: string;
+  as4date?: string;
+  as4time?: string;
+  tarsystem?: string;
   retcode?: string;
   message?: string;
   objects?: IcfObject[];
@@ -51,6 +54,9 @@ function mapRequest(raw: IcfRequest): ChangeRequest {
     client: String(raw.client ?? ""),
     owner: String(raw.owner ?? ""),
     status: String(raw.status ?? ""),
+    as4date: String(raw.as4date ?? ""),
+    as4time: String(raw.as4time ?? ""),
+    tarsystem: String(raw.tarsystem ?? ""),
     retcode: String(raw.retcode ?? "000"),
     message: String(raw.message ?? ""),
     objects: (raw.objects ?? []).map(mapObject),

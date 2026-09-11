@@ -11,6 +11,12 @@ export type ChangeRequest = {
   client: string;
   owner: string;
   status: string;
+  /** E070-AS4DATE (YYYYMMDD) */
+  as4date: string;
+  /** E070-AS4TIME (HHMMSS) */
+  as4time: string;
+  /** E070-TARSYSTEM */
+  tarsystem: string;
   retcode: string;
   message: string;
   objects: CtsObject[];

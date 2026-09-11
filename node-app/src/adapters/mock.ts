@@ -8,7 +8,7 @@ import type {
   ExtractResult,
 } from "../lib/types.js";
 
-type MockRecord = ChangeRequest & { as4date: string };
+type MockRecord = ChangeRequest;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const samplePath = join(__dirname, "../../sample-data/mock-requests.json");
@@ -49,10 +49,12 @@ export class MockAdapter implements CtsAdapter {
     const max = filters.max && filters.max > 0 ? filters.max : 500;
     const selected = catalog.filter((r) => matches(r, filters)).slice(0, max);
 
-    // Mirror CTS_API_READ_CHANGE_REQUEST: one call per request id
-    const requests: ChangeRequest[] = selected.map(
-      ({ as4date: _d, ...rest }) => ({ ...rest }),
-    );
+    const requests: ChangeRequest[] = selected.map((row) => ({
+      ...row,
+      as4date: row.as4date ?? "",
+      as4time: row.as4time ?? "",
+      tarsystem: row.tarsystem ?? "",
+    }));
 
     const failed = requests.filter((r) => r.retcode && r.retcode !== "000").length;
     const ok = requests.length - failed;

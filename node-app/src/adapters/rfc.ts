@@ -19,6 +19,9 @@ type HeaderRow = {
   trfunction: string;
   trstatus: string;
   as4user: string;
+  as4date: string;
+  as4time: string;
+  tarsystem: string;
 };
 
 const OPTION_WIDTH = 72;
@@ -182,7 +185,7 @@ async function readHeaders(
       const data = await rfcReadTable(
         client,
         "E070",
-        ["TRKORR", "TRFUNCTION", "TRSTATUS", "AS4USER"],
+        ["TRKORR", "TRFUNCTION", "TRSTATUS", "AS4USER", "AS4DATE", "AS4TIME", "TARSYSTEM"],
         trkorrOptions(chunk),
         0,
       );
@@ -194,13 +197,27 @@ async function readHeaders(
           trfunction: r.TRFUNCTION ?? "",
           trstatus: r.TRSTATUS ?? "",
           as4user: r.AS4USER ?? "",
+          as4date: r.AS4DATE ?? "",
+          as4time: r.AS4TIME ?? "",
+          tarsystem: r.TARSYSTEM ?? "",
         });
       }
     }
     // Preserve caller order for explicit IDs
     const byId = new Map(rows.map((r) => [r.trkorr, r]));
     return limited
-      .map((id) => byId.get(id) ?? { trkorr: id, trfunction: "", trstatus: "", as4user: "" })
+      .map(
+        (id) =>
+          byId.get(id) ?? {
+            trkorr: id,
+            trfunction: "",
+            trstatus: "",
+            as4user: "",
+            as4date: "",
+            as4time: "",
+            tarsystem: "",
+          },
+      )
       .filter((r) => r.trkorr);
   }
 
@@ -208,7 +225,7 @@ async function readHeaders(
   const data = await rfcReadTable(
     client,
     "E070",
-    ["TRKORR", "TRFUNCTION", "TRSTATUS", "AS4USER"],
+    ["TRKORR", "TRFUNCTION", "TRSTATUS", "AS4USER", "AS4DATE", "AS4TIME", "TARSYSTEM"],
     headerFilterOptions(filters),
     max,
   );
@@ -218,6 +235,9 @@ async function readHeaders(
       trfunction: r.TRFUNCTION ?? "",
       trstatus: r.TRSTATUS ?? "",
       as4user: r.AS4USER ?? "",
+      as4date: r.AS4DATE ?? "",
+      as4time: r.AS4TIME ?? "",
+      tarsystem: r.TARSYSTEM ?? "",
     }))
     .filter((r) => r.trkorr);
 }
@@ -292,6 +312,9 @@ async function extractViaTables(
     client: "",
     owner: h.as4user,
     status: h.trstatus,
+    as4date: h.as4date,
+    as4time: h.as4time,
+    tarsystem: h.tarsystem,
     retcode: "000",
     message: "",
     objects: objects.get(h.trkorr) ?? [],
@@ -322,6 +345,9 @@ async function readChangeRequest(
     client: asString(result.CLIENT),
     owner: asString(result.OWNER),
     status: asString(result.STATUS),
+    as4date: "",
+    as4time: "",
+    tarsystem: "",
     retcode: asString(result.RETCODE) || "000",
     message: asString(result.MESSAGE),
     objects: mapObjects(result.OBJECTS),
@@ -338,6 +364,9 @@ async function extractViaFm(
   for (const h of headers) {
     try {
       const row = await readChangeRequest(client, h.trkorr);
+      row.as4date = h.as4date;
+      row.as4time = h.as4time;
+      row.tarsystem = h.tarsystem;
       if (filters.includeObjects === false) {
         row.objects = [];
       }
@@ -350,6 +379,9 @@ async function extractViaFm(
         client: "",
         owner: h.as4user,
         status: h.trstatus,
+        as4date: h.as4date,
+        as4time: h.as4time,
+        tarsystem: h.tarsystem,
         retcode: "999",
         message: err instanceof Error ? err.message : String(err),
         objects: [],
