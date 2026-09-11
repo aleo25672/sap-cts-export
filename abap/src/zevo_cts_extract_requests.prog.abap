@@ -35,9 +35,11 @@ SELECTION-SCREEN END OF BLOCK b1.
 
 SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE TEXT-002.
 PARAMETERS:
-  p_gui  RADIOBUTTON GROUP out DEFAULT 'X',
-  p_file RADIOBUTTON GROUP out,
-  p_path TYPE string LOWER CASE DEFAULT '/tmp/cts_extract.csv'.
+  p_gui   RADIOBUTTON GROUP out DEFAULT 'X' USER-COMMAND out,
+  p_file  RADIOBUTTON GROUP out,
+  p_lfile TYPE filename-fileintern DEFAULT 'ZEVO_CTS_EXTRACT' MODIF ID fil,
+  p_path  TYPE string LOWER CASE MODIF ID fil.
+SELECTION-SCREEN COMMENT /1(79) TEXT-005 MODIF ID fil.
 SELECTION-SCREEN END OF BLOCK b2.
 
 SELECTION-SCREEN BEGIN OF BLOCK b3 WITH FRAME TITLE TEXT-003.
@@ -49,6 +51,18 @@ SELECTION-SCREEN END OF BLOCK b3.
 SELECTION-SCREEN BEGIN OF BLOCK b4 WITH FRAME TITLE TEXT-004.
 PARAMETERS p_max TYPE i DEFAULT 500.
 SELECTION-SCREEN END OF BLOCK b4.
+
+AT SELECTION-SCREEN OUTPUT.
+  LOOP AT SCREEN.
+    IF screen-group1 = 'FIL'.
+      IF p_gui = abap_true.
+        screen-active = '0'.
+      ELSE.
+        screen-active = '1'.
+      ENDIF.
+      MODIFY SCREEN.
+    ENDIF.
+  ENDLOOP.
 
 TYPES: BEGIN OF ty_header_row,
          request     TYPE char20,
@@ -290,9 +304,51 @@ FORM csv_escape CHANGING cv TYPE clike.
 ENDFORM.
 
 *&---------------------------------------------------------------------*
+FORM resolve_appserver_path CHANGING cv_path TYPE string.
+  DATA: lv_logical TYPE filename-fileintern,
+        lv_phys    TYPE string,
+        lv_param1  TYPE c LENGTH 50,
+        lv_param2  TYPE c LENGTH 50.
+
+  IF p_path IS NOT INITIAL.
+    cv_path = p_path.
+    RETURN.
+  ENDIF.
+
+  lv_logical = p_lfile.
+  IF lv_logical IS INITIAL.
+    MESSAGE 'Enter a logical file name (transaction FILE) or a physical path.'
+            TYPE 'E'.
+  ENDIF.
+
+  lv_param1 = |{ sy-datum }|.
+  lv_param2 = |{ sy-uzeit }|.
+
+  " Resolve via transaction FILE (logical file → physical path)
+  CALL FUNCTION 'FILE_GET_NAME'
+    EXPORTING
+      logical_filename = lv_logical
+      including_dir    = 'X'
+      parameter_1      = lv_param1
+      parameter_2      = lv_param2
+    IMPORTING
+      file_name        = lv_phys
+    EXCEPTIONS
+      file_not_found   = 1
+      OTHERS           = 2.
+  IF sy-subrc <> 0 OR lv_phys IS INITIAL.
+    MESSAGE |Logical file { lv_logical } not found. Maintain it in transaction FILE.|
+            TYPE 'E'.
+  ENDIF.
+
+  cv_path = lv_phys.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
 FORM output_csv.
   DATA: lv_filename TYPE string,
-        lv_path     TYPE string.
+        lv_path     TYPE string,
+        lv_msg      TYPE string.
 
   IF gt_csv IS INITIAL.
     MESSAGE 'Nothing to write to CSV.' TYPE 'S' DISPLAY LIKE 'E'.
@@ -318,8 +374,7 @@ FORM output_csv.
       MESSAGE |GUI download failed (sy-subrc={ sy-subrc }).| TYPE 'E'.
     ENDIF.
   ELSE.
-    DATA lv_msg TYPE string.
-    lv_path = p_path.
+    PERFORM resolve_appserver_path CHANGING lv_path.
     OPEN DATASET lv_path FOR OUTPUT IN TEXT MODE ENCODING UTF-8 MESSAGE lv_msg.
     IF sy-subrc <> 0.
       MESSAGE |Cannot open dataset { lv_path }: { lv_msg }.| TYPE 'E'.
@@ -328,5 +383,6 @@ FORM output_csv.
       TRANSFER gv_line TO lv_path.
     ENDLOOP.
     CLOSE DATASET lv_path.
+    MESSAGE |CSV written to { lv_path }.| TYPE 'S'.
   ENDIF.
 ENDFORM.

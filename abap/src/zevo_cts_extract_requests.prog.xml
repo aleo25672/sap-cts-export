@@ -40,6 +40,12 @@
      <LENGTH>13</LENGTH>
     </item>
     <item>
+     <ID>I</ID>
+     <KEY>005</KEY>
+     <ENTRY>Leave path empty to resolve physical file via transaction FILE</ENTRY>
+     <LENGTH>72</LENGTH>
+    </item>
+    <item>
      <ID>S</ID>
      <KEY>P_TRKORR</KEY>
      <ENTRY>Transport request</ENTRY>
@@ -97,9 +103,16 @@
     </item>
     <item>
      <ID>S</ID>
+     <KEY>P_LFILE</KEY>
+     <ENTRY>Logical file (FILE)</ENTRY>
+     <LENGTH>27</LENGTH>
+     <SPLIT>D</SPLIT>
+    </item>
+    <item>
+     <ID>S</ID>
      <KEY>P_PATH</KEY>
-     <ENTRY>App-server path</ENTRY>
-     <LENGTH>23</LENGTH>
+     <ENTRY>Physical path (optional)</ENTRY>
+     <LENGTH>31</LENGTH>
      <SPLIT>D</SPLIT>
     </item>
     <item>
