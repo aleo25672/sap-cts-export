@@ -1,13 +1,18 @@
 # CTS Extract
 
-Two ways to pull SAP transport / change requests through **`CTS_API_READ_CHANGE_REQUEST`** and save them as CSV:
+Three ways to pull SAP transport / change requests through **`CTS_API_READ_CHANGE_REQUEST`** and get CSV:
 
-| Option | Path | When to use |
-|--------|------|-------------|
-| **ABAP report** | [`abap/`](./abap/) | Run inside the SAP system (SE38), GUI download or app-server file |
-| **Node.js app** | [`node-app/`](./node-app/) | Extract over RFC from a workstation or server; browser UI + CLI |
+| # | Option | Path | When to use |
+|---|--------|------|-------------|
+| **1** | **Pure ABAP report** | [`abap/z_cts_extract_requests.abap`](./abap/z_cts_extract_requests.abap) | Run inside SAP (SE38); GUI download or app-server file |
+| **2** | **Node + RFC adapter** | [`node-app/`](./node-app/) with `CTS_ADAPTER=rfc` | Direct RFC from Node via `node-rfc` + NWRFC SDK |
+| **3** | **ABAP ICF + Node HTTP** | [`abap/zcl_cts_extract_icf.clas.abap`](./abap/zcl_cts_extract_icf.clas.abap) + `CTS_ADAPTER=http` | HTTPS to a custom SICF service that wraps the FM |
 
-Both produce the same CSV shapes (request headers and/or object lines).
+```text
+1) SE38 report  →  CTS_API_READ_CHANGE_REQUEST  →  CSV
+2) Node RFC     →  CTS_API_READ_CHANGE_REQUEST  →  CSV
+3) Node HTTP    →  ICF ZCL_CTS_EXTRACT_ICF  →  CTS_API_READ_CHANGE_REQUEST  →  JSON/CSV
+```
 
 ## Function module
 
@@ -19,63 +24,79 @@ Both produce the same CSV shapes (request headers and/or object lines).
 | Exporting | `DESCRIPTION`, `CATEGORY`, `CLIENT`, `OWNER`, `STATUS`, `RETCODE`, `MESSAGE` | text / char |
 | Tables | `OBJECTS` | `CTS_OBJ` |
 
-The FM reads **one** request. Both extractors select a list of request IDs (from `E070` or an explicit list), then call the FM per ID.
+The FM reads **one** request. All options resolve a list of IDs (from `E070` or an explicit list), then call the FM per ID.
 
-## Option A — ABAP
+---
 
-See [`abap/README.md`](./abap/README.md). Paste [`abap/z_cts_extract_requests.abap`](./abap/z_cts_extract_requests.abap) into program `Z_CTS_EXTRACT_REQUESTS` and activate.
+## Option 1 — Pure ABAP
 
-## Option B — Node.js
+See [`abap/README.md`](./abap/README.md). Paste the report into `Z_CTS_EXTRACT_REQUESTS` and activate.
+
+---
+
+## Option 2 — Node RFC adapter
 
 ```bash
 cd node-app
 cp .env.example .env
+# CTS_ADAPTER=rfc + SAP_* connection vars
 npm install
+npm install node-rfc   # needs SAP NWRFC SDK on the machine
 npm start
 ```
 
-Open the UI (default [http://127.0.0.1:43127](http://127.0.0.1:43127)).
+Requires NWRFC SDK, network to the app server, and an RFC user that can call the FM (and `RFC_READ_TABLE` on `E070` if you filter by date/owner).
 
-### Adapters
+---
 
-- **`CTS_ADAPTER=mock`** (default) — uses [`node-app/sample-data/mock-requests.json`](./node-app/sample-data/mock-requests.json). No SAP system required.
-- **`CTS_ADAPTER=rfc`** — connects with [`node-rfc`](https://www.npmjs.com/package/node-rfc) and the SAP NetWeaver RFC SDK. Lists IDs via `RFC_READ_TABLE` on `E070` (or uses IDs you paste), then calls `CTS_API_READ_CHANGE_REQUEST`.
+## Option 3 — Custom ABAP ICF + Node HTTP adapter
 
-RFC env vars (see `.env.example`):
+1. Install the ICF handler: [`abap/ICF.md`](./abap/ICF.md) / [`abap/zcl_cts_extract_icf.clas.abap`](./abap/zcl_cts_extract_icf.clas.abap)
+2. Point Node at it:
 
 ```bash
-CTS_ADAPTER=rfc
-SAP_ASHOST=...
-SAP_SYSNR=00
-SAP_CLIENT=100
-SAP_USER=...
-SAP_PASSWD=...
-SAP_LANG=EN
+cd node-app
+CTS_ADAPTER=http
+CTS_HTTP_URL=https://<host>:<port>/sap/bc/zcts_extract?sap-client=100
+CTS_HTTP_USER=...
+CTS_HTTP_PASSWD=...
+npm start
 ```
 
-### CLI
+**Local demo without SAP:** the Node app also exposes a mock of that ICF contract at  
+`http://127.0.0.1:43127/sap/bc/zcts_extract` — set `CTS_HTTP_URL` to that URL with `CTS_ADAPTER=http`.
+
+---
+
+## Node UI / CLI (options 2 & 3, plus mock)
+
+```bash
+cd node-app && npm install && npm start
+```
+
+App: [http://127.0.0.1:43127](http://127.0.0.1:43127)
 
 ```bash
 npm run extract -- --requests S4HK900123,S4HK900124 --out transports.csv
-npm run extract -- --from 2026-03-01 --to 2026-04-30 --owner DEVELOPER1
 ```
+
+### Adapters (`CTS_ADAPTER`)
+
+| Value | Behaviour |
+|-------|-----------|
+| `mock` | Sample JSON (default) |
+| `rfc` | `node-rfc` → FM |
+| `http` | HTTPS → ICF handler → FM |
 
 ### API
 
 - `GET /api/health`
 - `POST /api/extract` — JSON preview
 - `POST /api/extract.csv` — CSV download
+- `POST /sap/bc/zcts_extract` — local ICF-shaped mock (for option 3 demos)
 
 ## CSV columns
 
-**Object rows**
-
 ```text
 REQUEST,DESCRIPTION,CATEGORY,CLIENT,OWNER,STATUS,PGMID,OBJECT,OBJ_NAME,RETCODE,MESSAGE
-```
-
-**Header-only rows**
-
-```text
-REQUEST,DESCRIPTION,CATEGORY,CLIENT,OWNER,STATUS,RETCODE,MESSAGE
 ```

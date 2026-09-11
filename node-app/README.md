@@ -1,8 +1,8 @@
 # CTS Extract — Node.js app
 
-Web UI + CLI that call `CTS_API_READ_CHANGE_REQUEST` and export CSV.
+Web UI + CLI for options **2 (RFC)** and **3 (HTTP/ICF)**, plus a **mock** adapter for local demos.
 
-## Quick start (mock, no SAP)
+## Quick start (mock)
 
 ```bash
 cp .env.example .env
@@ -10,13 +10,17 @@ npm install
 npm start
 ```
 
-App: http://127.0.0.1:43127
+UI: http://127.0.0.1:43127
 
-## RFC mode
+## Adapters
 
-1. Install the [SAP NWRFC SDK](https://support.sap.com/en/product/connectors/nwrfcsdk.html) and set `SAPNWRFC_HOME` / library path per SAP docs.
-2. `npm install node-rfc`
-3. Set in `.env`:
+| `CTS_ADAPTER` | Needs | Calls |
+|---------------|-------|-------|
+| `mock` | nothing | sample JSON |
+| `rfc` | NWRFC SDK + `node-rfc` | `CTS_API_READ_CHANGE_REQUEST` over RFC |
+| `http` | `CTS_HTTP_URL` (+ Basic/Bearer) | ABAP ICF `ZCL_CTS_EXTRACT_ICF` over HTTPS |
+
+### RFC
 
 ```bash
 CTS_ADAPTER=rfc
@@ -25,15 +29,32 @@ SAP_SYSNR=00
 SAP_CLIENT=100
 SAP_USER=...
 SAP_PASSWD=...
+npm install node-rfc
 ```
 
-Or use `SAP_DEST=...` with `sapnwrfc.ini`.
+### HTTP / ICF
+
+Point at the real SICF service (see [`../abap/ICF.md`](../abap/ICF.md)):
+
+```bash
+CTS_ADAPTER=http
+CTS_HTTP_URL=https://sap.example.com:44300/sap/bc/zcts_extract?sap-client=100
+CTS_HTTP_USER=...
+CTS_HTTP_PASSWD=...
+```
+
+Or demo the ICF contract locally (same Node process mocks `/sap/bc/zcts_extract`):
+
+```bash
+CTS_ADAPTER=http
+CTS_HTTP_URL=http://127.0.0.1:43127/sap/bc/zcts_extract
+```
 
 ## Scripts
 
 | Script | Purpose |
 |--------|---------|
 | `npm start` | HTTP server + UI |
-| `npm run dev` | Same with file watch |
-| `npm run extract -- …` | CLI CSV write |
+| `npm run dev` | Watch mode |
+| `npm run extract -- …` | CLI CSV |
 | `npm run build` | Typecheck |

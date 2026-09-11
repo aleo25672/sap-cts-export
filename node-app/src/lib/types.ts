@@ -31,7 +31,7 @@ export type ExtractFilters = {
 };
 
 export type ExtractResult = {
-  adapter: "mock" | "rfc";
+  adapter: "mock" | "rfc" | "http";
   fetchedAt: string;
   requests: ChangeRequest[];
   ok: number;
@@ -39,6 +39,6 @@ export type ExtractResult = {
 };
 
 export interface CtsAdapter {
-  readonly name: "mock" | "rfc";
+  readonly name: "mock" | "rfc" | "http";
   extract(filters: ExtractFilters): Promise<ExtractResult>;
 }
