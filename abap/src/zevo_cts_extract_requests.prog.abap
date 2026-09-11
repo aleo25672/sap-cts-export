@@ -12,44 +12,9 @@
 *&---------------------------------------------------------------------*
 REPORT zevo_cts_extract_requests.
 
-SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-001.
-PARAMETERS:
-  p_trkorr TYPE trkorr,
-  p_user   TYPE tr_as4user,
-  p_from   TYPE as4date OBLIGATORY DEFAULT sy-datum,
-  p_to     TYPE as4date OBLIGATORY DEFAULT sy-datum,
-  p_status TYPE trstatus,
-  p_funct  TYPE trfunction. " K=Workbench W=Customizing T=ToC
-SELECTION-SCREEN END OF BLOCK b1.
 
-SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE TEXT-002.
-PARAMETERS:
-  p_gui   RADIOBUTTON GROUP out DEFAULT 'X' USER-COMMAND out,
-  p_file  RADIOBUTTON GROUP out,
-  p_lfile TYPE filename-fileintern DEFAULT 'ZEVO_CTS_EXTRACT' MODIF ID fil,
-  p_path  TYPE string LOWER CASE MODIF ID fil.
-SELECTION-SCREEN COMMENT /1(79) TEXT-005 MODIF ID fil.
-SELECTION-SCREEN END OF BLOCK b2.
-
-SELECTION-SCREEN BEGIN OF BLOCK b3 WITH FRAME TITLE TEXT-003.
-PARAMETERS:
-  p_hdr   AS CHECKBOX DEFAULT 'X',
-  p_obj   AS CHECKBOX DEFAULT 'X',
-  p_usefm AS CHECKBOX DEFAULT ' '. " 1x CTS_API_READ_CHANGE_REQUEST per TR (slow)
-SELECTION-SCREEN END OF BLOCK b3.
-
-SELECTION-SCREEN BEGIN OF BLOCK b4 WITH FRAME TITLE TEXT-004.
-PARAMETERS p_max TYPE i DEFAULT 500.
-SELECTION-SCREEN END OF BLOCK b4.
-
-AT SELECTION-SCREEN OUTPUT.
-  LOOP AT SCREEN.
-    IF screen-group1 = 'FIL'.
-      screen-active = COND #( WHEN p_gui = abap_true THEN '0' ELSE '1' ).
-      MODIFY SCREEN.
-    ENDIF.
-  ENDLOOP.
-
+* Global TYPES/DATA must appear before event blocks;
+* otherwise they are local and FORMs cannot see GT_*/GV_*.
 *----------------------------------------------------------------------*
 TYPES: BEGIN OF ty_e070_key,
          trkorr     TYPE trkorr,
@@ -85,14 +50,56 @@ TYPES: BEGIN OF ty_csv_row,
          message     TYPE text80,
        END OF ty_csv_row.
 
-DATA: gt_e070 TYPE STANDARD TABLE OF ty_e070_key WITH EMPTY KEY,
+DATA: gt_e070 TYPE STANDARD TABLE OF ty_e070_key WITH DEFAULT KEY,
       gt_e07t TYPE HASHED TABLE OF ty_e07t WITH UNIQUE KEY trkorr,
       gt_e071 TYPE SORTED TABLE OF ty_e071 WITH NON-UNIQUE KEY trkorr,
-      gt_csv  TYPE STANDARD TABLE OF string WITH EMPTY KEY,
-      gt_rows TYPE STANDARD TABLE OF ty_csv_row WITH EMPTY KEY,
+      gt_csv  TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
+      gt_rows TYPE STANDARD TABLE OF ty_csv_row WITH DEFAULT KEY,
       gv_ok   TYPE i,
       gv_fail TYPE i,
       gv_line TYPE string.
+
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-001.
+PARAMETERS:
+  p_trkorr TYPE trkorr,
+  p_user   TYPE tr_as4user,
+  p_from   TYPE as4date OBLIGATORY DEFAULT sy-datum,
+  p_to     TYPE as4date OBLIGATORY DEFAULT sy-datum,
+  p_status TYPE trstatus,
+  p_funct  TYPE trfunction. " K=Workbench W=Customizing T=ToC
+SELECTION-SCREEN END OF BLOCK b1.
+
+SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE TEXT-002.
+PARAMETERS:
+  p_gui   RADIOBUTTON GROUP out DEFAULT 'X' USER-COMMAND out,
+  p_file  RADIOBUTTON GROUP out,
+  p_lfile TYPE filename-fileintern DEFAULT 'ZEVO_CTS_EXTRACT' MODIF ID fil,
+  p_path  TYPE string LOWER CASE MODIF ID fil.
+SELECTION-SCREEN COMMENT /1(79) TEXT-005 MODIF ID fil.
+SELECTION-SCREEN END OF BLOCK b2.
+
+SELECTION-SCREEN BEGIN OF BLOCK b3 WITH FRAME TITLE TEXT-003.
+PARAMETERS:
+  p_hdr   AS CHECKBOX DEFAULT 'X',
+  p_obj   AS CHECKBOX DEFAULT 'X',
+  p_usefm AS CHECKBOX DEFAULT ' '. " 1x CTS_API_READ_CHANGE_REQUEST per TR (slow)
+SELECTION-SCREEN END OF BLOCK b3.
+
+SELECTION-SCREEN BEGIN OF BLOCK b4 WITH FRAME TITLE TEXT-004.
+PARAMETERS p_max TYPE i DEFAULT 500.
+SELECTION-SCREEN END OF BLOCK b4.
+
+AT SELECTION-SCREEN OUTPUT.
+  LOOP AT SCREEN.
+    IF screen-group1 = 'FIL'.
+      IF p_gui = abap_true.
+        screen-active = '0'.
+      ELSE.
+        screen-active = '1'.
+      ENDIF.
+      MODIFY SCREEN.
+    ENDIF.
+  ENDLOOP.
 
 START-OF-SELECTION.
   PERFORM select_requests.
@@ -225,7 +232,7 @@ FORM extract_via_tables.
         ls_e07t    TYPE ty_e07t,
         ls_e071    TYPE ty_e071,
         ls_row     TYPE ty_csv_row,
-        lt_keys    TYPE STANDARD TABLE OF trkorr WITH EMPTY KEY,
+        lt_keys    TYPE STANDARD TABLE OF trkorr WITH DEFAULT KEY,
         lv_has_obj TYPE abap_bool.
 
   CLEAR: gt_e07t, gt_e071, gt_rows, gv_ok, gv_fail.
@@ -293,7 +300,7 @@ ENDFORM.
 FORM extract_via_cts_api.
   DATA: ls_e070    TYPE ty_e070_key,
         ls_row     TYPE ty_csv_row,
-        lt_cts_obj TYPE STANDARD TABLE OF cts_obj WITH EMPTY KEY,
+        lt_cts_obj TYPE STANDARD TABLE OF cts_obj WITH DEFAULT KEY,
         ls_cts     TYPE cts_obj,
         lv_desc    TYPE text60,
         lv_cat     TYPE char01,
@@ -303,7 +310,8 @@ FORM extract_via_cts_api.
         lv_ret     TYPE char3,
         lv_msg     TYPE text80,
         lv_total   TYPE i,
-        lv_idx     TYPE i.
+        lv_idx     TYPE i,
+        lv_pct     TYPE i.
 
   CLEAR: gt_rows, gv_ok, gv_fail.
   lv_total = lines( gt_e070 ).
@@ -311,7 +319,7 @@ FORM extract_via_cts_api.
   LOOP AT gt_e070 INTO ls_e070.
     lv_idx = lv_idx + 1.
     IF lv_total > 0 AND ( lv_idx = 1 OR lv_idx MOD 10 = 0 OR lv_idx = lv_total ).
-      DATA(lv_pct) = ( lv_idx * 100 ) DIV lv_total.
+      lv_pct = ( lv_idx * 100 ) DIV lv_total.
       CALL FUNCTION 'SAPGUI_PROGRESS_INDICATOR'
         EXPORTING
           percentage = lv_pct
