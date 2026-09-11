@@ -337,6 +337,7 @@ CLASS zevo_cl_sicf_setup IMPLEMENTATION.
   METHOD set_docu_fields.
     FIELD-SYMBOLS <fs> TYPE any.
 
+    UNASSIGN <fs>.
     ASSIGN COMPONENT 'ICF_LANGU' OF STRUCTURE cs_docu TO <fs>.
     IF sy-subrc <> 0.
       ASSIGN COMPONENT 'LANGU' OF STRUCTURE cs_docu TO <fs>.
