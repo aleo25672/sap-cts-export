@@ -111,11 +111,28 @@ export class HttpAdapter implements CtsAdapter {
       format: "json",
     };
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers: authHeader(),
-      body: JSON.stringify(body),
-    });
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: authHeader(),
+        body: JSON.stringify(body),
+      });
+    } catch (err) {
+      const cause =
+        err instanceof Error && "cause" in err && err.cause instanceof Error
+          ? err.cause.message
+          : "";
+      const hint =
+        url.startsWith("https://") && /10\.|192\.|172\./.test(url)
+          ? " If SAP answers on plain HTTP, set CTS_HTTP_URL to http://… (not https://)."
+          : "";
+      throw new Error(
+        `Cannot reach ICF at ${url}: ${err instanceof Error ? err.message : String(err)}${
+          cause ? ` (${cause})` : ""
+        }.${hint}`,
+      );
+    }
 
     const text = await res.text();
     let data: IcfResponse;
