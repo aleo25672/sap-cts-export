@@ -60,6 +60,7 @@ The Node **RFC** and **HTTP** adapters mirror the same default vs. use-FM switch
 - Confirm `CTS_OBJ` field names in SE11 if object mapping is empty.
 - ICF class needs `/UI2/CL_JSON`.
 - Wire SICF via the **separate** [`sicf-setup`](../sicf-setup/) tool: URL `/sap/bc/zevo_cts_extract`, handler `ZEVO_CTS_EXTRACT_ICF` (see example batch in that repo).
+- Report output options: **Download via SAP GUI**, **Write app-server file**, or **Display in ALV (no download)**.
 - For app-server CSV output, maintain logical file **`ZEVO_CTS_EXTRACT`** in transaction **FILE** (see below).
 
 ## Logical file (transaction FILE)

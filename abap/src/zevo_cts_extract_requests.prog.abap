@@ -85,6 +85,10 @@ SELECTION-SCREEN BEGIN OF LINE.
 PARAMETERS p_file RADIOBUTTON GROUP out.
 SELECTION-SCREEN COMMENT 3(50) c_file FOR FIELD p_file.
 SELECTION-SCREEN END OF LINE.
+SELECTION-SCREEN BEGIN OF LINE.
+PARAMETERS p_alv RADIOBUTTON GROUP out.
+SELECTION-SCREEN COMMENT 3(50) c_alv FOR FIELD p_alv.
+SELECTION-SCREEN END OF LINE.
 PARAMETERS:
   p_lfile TYPE filename-fileintern DEFAULT 'ZEVO_CTS_EXTRACT' MODIF ID fil,
   p_path  TYPE string LOWER CASE MODIF ID fil.
@@ -113,6 +117,7 @@ SELECTION-SCREEN END OF BLOCK b4.
 INITIALIZATION.
   c_gui   = 'Download via SAP GUI'(010).
   c_file  = 'Write app-server file'(011).
+  c_alv   = 'Display in ALV (no download)'(015).
   c_hdr   = 'Include header rows'(012).
   c_obj   = 'Include object rows'(013).
   c_usefm = 'Use CTS API (slow)'(014).
@@ -120,10 +125,10 @@ INITIALIZATION.
 AT SELECTION-SCREEN OUTPUT.
   LOOP AT SCREEN.
     IF screen-group1 = 'FIL'.
-      IF p_gui = abap_true.
-        screen-active = '0'.
-      ELSE.
+      IF p_file = abap_true.
         screen-active = '1'.
+      ELSE.
+        screen-active = '0'.
       ENDIF.
       MODIFY SCREEN.
     ENDIF.
@@ -142,11 +147,16 @@ START-OF-SELECTION.
     PERFORM extract_via_tables.
   ENDIF.
 
-  PERFORM build_csv.
-  PERFORM output_csv.
-
-  MESSAGE |Extracted { gv_ok } request(s), { gv_fail } failed. CSV lines: { lines( gt_csv ) }.|
-          TYPE 'S'.
+  IF p_alv = abap_true.
+    PERFORM display_alv.
+    MESSAGE |Extracted { gv_ok } request(s), { gv_fail } failed. ALV rows: { lines( gt_rows ) }.|
+            TYPE 'S'.
+  ELSE.
+    PERFORM build_csv.
+    PERFORM output_csv.
+    MESSAGE |Extracted { gv_ok } request(s), { gv_fail } failed. CSV lines: { lines( gt_csv ) }.|
+            TYPE 'S'.
+  ENDIF.
 
 *&---------------------------------------------------------------------*
 *& Select only needed E070 columns; avoid OR on empty filters so indexes
@@ -524,6 +534,123 @@ FORM resolve_appserver_path CHANGING cv_path TYPE string.
   ENDIF.
 
   cv_path = lv_phys.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Display extracted rows in ALV — no CSV download / file write.
+*&---------------------------------------------------------------------*
+FORM display_alv.
+  DATA: lo_alv   TYPE REF TO cl_salv_table,
+        lo_funcs TYPE REF TO cl_salv_functions_list,
+        lo_cols  TYPE REF TO cl_salv_columns_table,
+        lo_col   TYPE REF TO cl_salv_column,
+        lx       TYPE REF TO cx_root.
+
+  IF gt_rows IS INITIAL.
+    MESSAGE 'Nothing to display in ALV.' TYPE 'S' DISPLAY LIKE 'E'.
+    RETURN.
+  ENDIF.
+
+  TRY.
+      cl_salv_table=>factory(
+        IMPORTING
+          r_salv_table = lo_alv
+        CHANGING
+          t_table      = gt_rows ).
+
+      lo_funcs = lo_alv->get_functions( ).
+      lo_funcs->set_all( abap_true ).
+
+      lo_cols = lo_alv->get_columns( ).
+      lo_cols->set_optimize( abap_true ).
+
+      TRY.
+          lo_col ?= lo_cols->get_column( 'REQUEST' ).
+          lo_col->set_short_text( 'Request' ).
+          lo_col->set_medium_text( 'Request' ).
+          lo_col->set_long_text( 'Transport request' ).
+
+          lo_col ?= lo_cols->get_column( 'DESCRIPTION' ).
+          lo_col->set_short_text( 'Desc.' ).
+          lo_col->set_medium_text( 'Description' ).
+          lo_col->set_long_text( 'Description' ).
+
+          lo_col ?= lo_cols->get_column( 'CATEGORY' ).
+          lo_col->set_short_text( 'Cat.' ).
+          lo_col->set_medium_text( 'Category' ).
+          lo_col->set_long_text( 'Category' ).
+
+          lo_col ?= lo_cols->get_column( 'CLIENT' ).
+          lo_col->set_short_text( 'Client' ).
+          lo_col->set_medium_text( 'Client' ).
+          lo_col->set_long_text( 'Client' ).
+
+          lo_col ?= lo_cols->get_column( 'OWNER' ).
+          lo_col->set_short_text( 'Owner' ).
+          lo_col->set_medium_text( 'Owner' ).
+          lo_col->set_long_text( 'Owner' ).
+
+          lo_col ?= lo_cols->get_column( 'STATUS' ).
+          lo_col->set_short_text( 'Status' ).
+          lo_col->set_medium_text( 'Status' ).
+          lo_col->set_long_text( 'Status' ).
+
+          lo_col ?= lo_cols->get_column( 'AS4DATE' ).
+          lo_col->set_short_text( 'Date' ).
+          lo_col->set_medium_text( 'Last change' ).
+          lo_col->set_long_text( 'Last change date' ).
+
+          lo_col ?= lo_cols->get_column( 'AS4TIME' ).
+          lo_col->set_short_text( 'Time' ).
+          lo_col->set_medium_text( 'Last time' ).
+          lo_col->set_long_text( 'Last change time' ).
+
+          lo_col ?= lo_cols->get_column( 'TARSYSTEM' ).
+          lo_col->set_short_text( 'Target' ).
+          lo_col->set_medium_text( 'Target sys' ).
+          lo_col->set_long_text( 'Target system' ).
+
+          lo_col ?= lo_cols->get_column( 'PGMID' ).
+          lo_col->set_short_text( 'PGMID' ).
+          lo_col->set_medium_text( 'Program ID' ).
+          lo_col->set_long_text( 'Program ID' ).
+
+          lo_col ?= lo_cols->get_column( 'OBJECT' ).
+          lo_col->set_short_text( 'Object' ).
+          lo_col->set_medium_text( 'Object type' ).
+          lo_col->set_long_text( 'Object type' ).
+
+          lo_col ?= lo_cols->get_column( 'OBJ_NAME' ).
+          lo_col->set_short_text( 'Obj.name' ).
+          lo_col->set_medium_text( 'Object name' ).
+          lo_col->set_long_text( 'Object name' ).
+
+          lo_col ?= lo_cols->get_column( 'RETCODE' ).
+          lo_col->set_short_text( 'RC' ).
+          lo_col->set_medium_text( 'Return code' ).
+          lo_col->set_long_text( 'Return code' ).
+
+          lo_col ?= lo_cols->get_column( 'MESSAGE' ).
+          lo_col->set_short_text( 'Message' ).
+          lo_col->set_medium_text( 'Message' ).
+          lo_col->set_long_text( 'Message' ).
+        CATCH cx_salv_not_found.                          "#EC NO_HANDLER
+      ENDTRY.
+
+      " Hide object columns when object rows are not requested
+      IF p_obj = abap_false.
+        TRY.
+            lo_cols->get_column( 'PGMID' )->set_technical( abap_true ).
+            lo_cols->get_column( 'OBJECT' )->set_technical( abap_true ).
+            lo_cols->get_column( 'OBJ_NAME' )->set_technical( abap_true ).
+          CATCH cx_salv_not_found.                        "#EC NO_HANDLER
+        ENDTRY.
+      ENDIF.
+
+      lo_alv->display( ).
+    CATCH cx_root INTO lx.
+      MESSAGE lx->get_text( ) TYPE 'E'.
+  ENDTRY.
 ENDFORM.
 
 *&---------------------------------------------------------------------*
