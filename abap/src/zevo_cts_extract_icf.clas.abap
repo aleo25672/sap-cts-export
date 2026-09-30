@@ -763,6 +763,17 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
       |REQUEST,DESCRIPTION,CATEGORY,CLIENT,OWNER,STATUS,AS4DATE,AS4TIME,TARSYSTEM,PGMID,OBJECT,OBJ_NAME,RETCODE,MESSAGE|
       TO lt_lines.
 
+    " Source table / API for each column
+    IF iv_use_fm = abap_true.
+      APPEND
+        |E070,CTS_API,CTS_API,CTS_API,CTS_API,CTS_API,E070,E070,E070,CTS_OBJ,CTS_OBJ,CTS_OBJ,CTS_API,CTS_API|
+        TO lt_lines.
+    ELSE.
+      APPEND
+        |E070,E07T,E070,,E070,E070,E070,E070,E070,E071,E071,E071,,|
+        TO lt_lines.
+    ENDIF.
+
     LOOP AT it_requests INTO ls_req.
       IF ls_req-objects IS INITIAL.
         lv_line =
