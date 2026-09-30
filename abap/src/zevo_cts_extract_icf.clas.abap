@@ -171,8 +171,11 @@ CLASS zevo_cts_extract_icf DEFINITION
       RETURNING VALUE(rv_bool)  TYPE abap_bool.
 
     METHODS build_csv
-      IMPORTING it_requests   TYPE tty_request
-      RETURNING VALUE(rv_csv) TYPE string.
+      IMPORTING
+        it_requests   TYPE tty_request
+        iv_use_fm     TYPE abap_bool DEFAULT abap_false
+      RETURNING
+        VALUE(rv_csv) TYPE string.
 
     METHODS csv_quote
       IMPORTING iv_raw         TYPE clike
@@ -259,7 +262,9 @@ CLASS zevo_cts_extract_icf IMPLEMENTATION.
     ENDIF.
 
     IF ls_filters-format = 'csv'.
-      lv_csv = build_csv( lt_requests ).
+      lv_csv = build_csv(
+                 it_requests = lt_requests
+                 iv_use_fm   = ls_filters-use_fm ).
       io_server->response->set_status( code = 200 reason = 'OK' ).
       io_server->response->set_header_field(
         name = 'Content-Type' value = 'text/csv; charset=utf-8' ).

@@ -105,5 +105,7 @@ npm run extract -- --requests S4HK900123,S4HK900124 --out transports.csv
 ## CSV columns
 
 ```text
-REQUEST,DESCRIPTION,CATEGORY,CLIENT,OWNER,STATUS,PGMID,OBJECT,OBJ_NAME,RETCODE,MESSAGE
+REQUEST,DESCRIPTION,CATEGORY,CLIENT,OWNER,STATUS,AS4DATE,AS4TIME,TARSYSTEM,PGMID,OBJECT,OBJ_NAME,RETCODE,MESSAGE
 ```
+
+A second header row names the **source table/API** per column (bulk: `E070` / `E07T` / `E071`; use-FM: `CTS_API` / `CTS_OBJ` for FM fields). In the ABAP report, toggle with **Include source-table header row**.

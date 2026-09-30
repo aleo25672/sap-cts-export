@@ -105,6 +105,10 @@ PARAMETERS p_obj AS CHECKBOX DEFAULT 'X'.
 SELECTION-SCREEN COMMENT 3(50) c_obj FOR FIELD p_obj.
 SELECTION-SCREEN END OF LINE.
 SELECTION-SCREEN BEGIN OF LINE.
+PARAMETERS p_srctab AS CHECKBOX DEFAULT 'X'.
+SELECTION-SCREEN COMMENT 3(50) c_srctab FOR FIELD p_srctab.
+SELECTION-SCREEN END OF LINE.
+SELECTION-SCREEN BEGIN OF LINE.
 PARAMETERS p_usefm AS CHECKBOX DEFAULT ' '.
 SELECTION-SCREEN COMMENT 3(50) c_usefm FOR FIELD p_usefm.
 SELECTION-SCREEN END OF LINE.
@@ -115,12 +119,13 @@ PARAMETERS p_max TYPE i DEFAULT 500.
 SELECTION-SCREEN END OF BLOCK b4.
 
 INITIALIZATION.
-  c_gui   = 'Download via SAP GUI'(010).
-  c_file  = 'Write app-server file'(011).
-  c_alv   = 'Display in ALV (no download)'(015).
-  c_hdr   = 'Include header rows'(012).
-  c_obj   = 'Include object rows'(013).
-  c_usefm = 'Use CTS API (slow)'(014).
+  c_gui    = 'Download via SAP GUI'(010).
+  c_file   = 'Write app-server file'(011).
+  c_alv    = 'Display in ALV (no download)'(015).
+  c_hdr    = 'Include header rows'(012).
+  c_obj    = 'Include object rows'(013).
+  c_srctab = 'Include source-table header row'(016).
+  c_usefm  = 'Use CTS API (slow)'(014).
 
 AT SELECTION-SCREEN OUTPUT.
   LOOP AT SCREEN.
@@ -450,7 +455,8 @@ FORM build_csv.
   DATA: ls_row  TYPE ty_csv_row,
         lv_desc TYPE as4text,
         lv_msg  TYPE text80,
-        lv_name TYPE sobj_name.
+        lv_name TYPE sobj_name,
+        lv_src  TYPE string.
 
   CLEAR gt_csv.
   IF gt_rows IS INITIAL.
@@ -463,6 +469,12 @@ FORM build_csv.
   ELSE.
     APPEND |REQUEST,DESCRIPTION,CATEGORY,CLIENT,OWNER,STATUS,AS4DATE,AS4TIME,TARSYSTEM,RETCODE,MESSAGE|
       TO gt_csv.
+  ENDIF.
+
+  " Second header row: DDIC / API source for each column
+  IF p_srctab = abap_true.
+    PERFORM csv_source_row CHANGING lv_src.
+    APPEND lv_src TO gt_csv.
   ENDIF.
 
   LOOP AT gt_rows INTO ls_row.
@@ -484,6 +496,50 @@ FORM build_csv.
     ENDIF.
     APPEND gv_line TO gt_csv.
   ENDLOOP.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Source table/API for each CSV column (depends on bulk vs use-FM path).
+*&---------------------------------------------------------------------*
+FORM csv_source_row CHANGING cv_line TYPE string.
+  DATA: lv_desc TYPE string,
+        lv_cat  TYPE string,
+        lv_cli  TYPE string,
+        lv_own  TYPE string,
+        lv_sta  TYPE string,
+        lv_rc   TYPE string,
+        lv_msg  TYPE string,
+        lv_obj  TYPE string.
+
+  IF p_usefm = abap_true.
+    lv_desc = 'CTS_API'.
+    lv_cat  = 'CTS_API'.
+    lv_cli  = 'CTS_API'.
+    lv_own  = 'CTS_API'.
+    lv_sta  = 'CTS_API'.
+    lv_rc   = 'CTS_API'.
+    lv_msg  = 'CTS_API'.
+    lv_obj  = 'CTS_OBJ'.
+  ELSE.
+    lv_desc = 'E07T'.
+    lv_cat  = 'E070'.
+    lv_cli  = ''.              " not filled on bulk path
+    lv_own  = 'E070'.
+    lv_sta  = 'E070'.
+    lv_rc   = ''.              " constant 000 on bulk path
+    lv_msg  = ''.
+    lv_obj  = 'E071'.
+  ENDIF.
+
+  IF p_obj = abap_true.
+    cv_line =
+      |E070,{ lv_desc },{ lv_cat },{ lv_cli },{ lv_own },{ lv_sta },| &&
+      |E070,E070,E070,{ lv_obj },{ lv_obj },{ lv_obj },{ lv_rc },{ lv_msg }|.
+  ELSE.
+    cv_line =
+      |E070,{ lv_desc },{ lv_cat },{ lv_cli },{ lv_own },{ lv_sta },| &&
+      |E070,E070,E070,{ lv_rc },{ lv_msg }|.
+  ENDIF.
 ENDFORM.
 
 *&---------------------------------------------------------------------*

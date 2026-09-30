@@ -82,6 +82,12 @@
      <LENGTH>26</LENGTH>
     </item>
     <item>
+     <ID>I</ID>
+     <KEY>016</KEY>
+     <ENTRY>Include source-table header row</ENTRY>
+     <LENGTH>40</LENGTH>
+    </item>
+    <item>
      <ID>S</ID>
      <KEY>P_TRKORR</KEY>
      <ENTRY>Transport request</ENTRY>
